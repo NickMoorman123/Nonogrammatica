@@ -1,0 +1,31 @@
+.nums {
+	-fx-border-color: black ;
+	-fx-border-width: 0 1 1 0 ;
+}
+
+.cell {
+	-fx-background-insets: 0, 2 3 3 2 ;
+	-fx-border-color: black ;
+	-fx-border-width: 0 1 1 0 ;
+}
+
+.cell.cursor {
+	-fx-border-color: yellow ;
+	-fx-border-width: 2 2 2 2 ;
+}
+
+.filled {
+	-fx-background-color: white, black ;
+}
+
+.after-fifth-row {
+	-fx-border-width: 1 1 1 0 ;
+}
+
+.after-fifth-column {
+	-fx-border-width: 0 1 1 1 ;
+}
+
+.after-fifth-row.after-fifth-column {
+	-fx-border-width: 1 1 1 1 ;
+}
