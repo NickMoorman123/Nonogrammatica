@@ -5,6 +5,7 @@ import javafx.scene.layout.Pane;
 public class PicrossPane extends Pane {
 	private int col;
 	private int row;
+	private boolean filled;
 	
 	public PicrossPane(int col, int row) {
 		this.col = col;
@@ -20,12 +21,26 @@ public class PicrossPane extends Pane {
 		return row;
 	}
 	
+	//need to remove before adding so that css tags are not added multiple times
 	public void setFilled() {
-		clear();
-		getStyleClass().add("filled");			
+		getStyleClass().remove("clear");
+		getStyleClass().remove("filled");
+		getStyleClass().add("filled");
+		filled = true;
 	}
 	
 	public void clear() {
 		getStyleClass().remove("filled");
+		getStyleClass().remove("clear");
+		getStyleClass().add("clear");
+		filled = false;
+	}
+	
+	public boolean filled() {
+		return filled;
+	}
+	
+	public void setUnknown() {
+		getStyleClass().add("unknown");
 	}
 }

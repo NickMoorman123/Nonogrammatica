@@ -1,10 +1,12 @@
 .nums {
 	-fx-border-color: black ;
+	-fx-background-color: white ;
 	-fx-border-width: 0 1 1 0 ;
 }
 
 .cell {
 	-fx-background-insets: 0, 2 3 3 2 ;
+	-fx-background-color: white, white ;
 	-fx-border-color: black ;
 	-fx-border-width: 0 1 1 0 ;
 }
@@ -14,8 +16,16 @@
 	-fx-border-width: 2 2 2 2 ;
 }
 
+.clear {
+	-fx-background-color: white, white ;
+}
+
 .filled {
 	-fx-background-color: white, black ;
+}
+
+.unknown {
+	-fx-background-color: white, red ;
 }
 
 .after-fifth-row {

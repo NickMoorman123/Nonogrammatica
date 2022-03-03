@@ -171,13 +171,13 @@ public class PicrossGrid extends GridPane {
 	
 	//color current cell based on state variable
 	private void color() {
-		if (state == KeyCode.Z) {
-			current.setFilled();
+		if (state == KeyCode.C) {
+			current.clear();
 			updateLabelsCol(current.getCol());
 			updateLabelsRow(current.getRow());
 			resizeLabels();
-		} else if (state == KeyCode.C) {
-			current.clear();
+		} else if (state == KeyCode.Z) {
+			current.setFilled();
 			updateLabelsCol(current.getCol());
 			updateLabelsRow(current.getRow());
 			resizeLabels();
@@ -189,7 +189,7 @@ public class PicrossGrid extends GridPane {
 		LinkedList<Integer> colNums = new LinkedList<Integer>();
 		int tempBlock = 0;
 		for (int r = 1; r <= numRows; r++) {
-			if (pointersToPanes[currentCol][r].getStyleClass().contains("filled")) {
+			if (pointersToPanes[currentCol][r].filled()) {
 				tempBlock++;
 			} else {
 				if (tempBlock > 0) {
@@ -216,7 +216,7 @@ public class PicrossGrid extends GridPane {
 		LinkedList<Integer> rowNums = new LinkedList<Integer>();
 		int tempBlock = 0;
 		for (int c = 1; c <= numCols; c++) {
-			if (pointersToPanes[c][currentRow].getStyleClass().contains("filled")) {
+			if (pointersToPanes[c][currentRow].filled()) {
 				tempBlock++;
 			} else {
 				if (tempBlock > 0) {
@@ -342,7 +342,7 @@ public class PicrossGrid extends GridPane {
 			for (int r = 1; r <= numRows; r++) { 
 				String[] row = new String[numCols];
 				for (int c = 1; c <= numCols; c++) { 
-					if (pointersToPanes[c][r].getStyleClass().contains("filled")) {
+					if (pointersToPanes[c][r].filled()) {
 						row[c - 1] = "1";
 					} else {
 						row[c - 1] = "0";
@@ -376,6 +376,8 @@ public class PicrossGrid extends GridPane {
 					String next = scanner.next();
 					if (next.trim().equals("1")) {
 						pointersToPanes[c][r].setFilled();
+					} else if (next.trim().equals("2")) {
+						pointersToPanes[c][r].setUnknown();
 					} else if (!next.trim().equals("0")) {
 						scanner.close();
 						return false;
@@ -439,8 +441,8 @@ public class PicrossGrid extends GridPane {
 		int[][] grid = new int[numCols][numRows];
 		for (int c = 1; c <= numCols; c++) { 
 			for (int r = 1; r <= numRows; r++) { 
-				if (pointersToPanes[c][r].getStyleClass().contains("filled")) {
-					pointersToPanes[c][r].getStyleClass().remove("filled");
+				if (pointersToPanes[c][r].filled()) {
+					pointersToPanes[c][r].clear();
 					grid[c - 1][r - 1] = 1;
 				} else {
 					grid[c - 1][r - 1] = 0;
@@ -453,7 +455,7 @@ public class PicrossGrid extends GridPane {
 		for (int c = 1; c <= numCols; c++) { 
 			for (int r = 1; r <= numRows; r++) { 
 				if (grid[c - 1][r - 1] == 1) {
-					pointersToPanes[c][r].getStyleClass().add("filled");
+					pointersToPanes[c][r].setFilled();
 				} 
 			}
 		}

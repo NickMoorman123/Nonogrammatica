@@ -21,7 +21,7 @@ public class PicrossSolver {
 		grid = new int[numCols][numRows];
 		for (int c = 0; c < numCols; c++) {
 			for (int r = 0; r < numRows; r++) {
-				grid[c][r] = 0;
+				grid[c][r] = 2;
 			}
 		}
 		
@@ -71,7 +71,7 @@ public class PicrossSolver {
 			Arrays.fill(rowsToUpdate, false);
 			for (int r = 0; r < numRows; r++) {
 				if (newline[r] != line[r]) {
-					if (line[r] == 0) {
+					if (line[r] == 2) {
 						grid[col][r] = newline[r];
 						changed = true;
 						rowsToUpdate[r] = true;
@@ -114,7 +114,7 @@ public class PicrossSolver {
 			Arrays.fill(colsToUpdate, false);
 			for (int c = 0; c < numCols; c++) {
 				if (newline[c] != line[c]) {
-					if (line[c] == 0) {
+					if (line[c] == 2) {
 						grid[c][row] = newline[c];
 						changed = true;
 						colsToUpdate[c] = true;
@@ -142,7 +142,7 @@ public class PicrossSolver {
 		}
 		for (int c = 0; c < numCols; c++) {
 			for (int r = 0; r < numRows; r++) {
-				if (grid[c][r] == 0) {
+				if (grid[c][r] == 2) {
 					return false;
 				}
 			}
@@ -165,11 +165,7 @@ public class PicrossSolver {
 			for (int r = 0; r < numRows; r++) { 
 				String[] row = new String[numCols];
 				for (int c = 0; c < numCols; c++) { 
-					if (grid[c][r] == 1) {
-						row[c] = "1";
-					} else {
-						row[c] = "0";
-					}
+					row[c] = "" + grid[c][r];
 				}
 				writer.write(String.join(",", row) + "\n");
 			}

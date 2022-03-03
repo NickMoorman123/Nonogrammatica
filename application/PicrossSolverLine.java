@@ -19,7 +19,7 @@ public class PicrossSolverLine {
 		try {
 			if (nums[0] == 0) {
 				int[] newline = new int[len];
-				Arrays.fill(newline, 2);
+				Arrays.fill(newline, 0);
 				return newline;
 			} else {
 				//furthest left/up possibility
@@ -112,7 +112,7 @@ public class PicrossSolverLine {
 				possibilities[i] = new PicrossSolverSquare();
 				if (line[i] == 1) {
 					possibilities[i].alreadyFilled();
-				} else if (line[i] == 2) {
+				} else if (line[i] == 0) {
 					possibilities[i].alreadyEmpty();
 				}
 			}
@@ -133,14 +133,14 @@ public class PicrossSolverLine {
 					//min and max are disjoint
 					//min is ambiguous
 					for (int i = left[numIndex]; i < left[numIndex] + num; i++) {
-						if (line[i] == 0) {
+						if (line[i] == 2) {
 							possibilities[i].mayBeFilled();
 							possibilities[i].mayBeEmpty();
 						}
 					}
 					//in between, mark cbfilled where there's room and cbempty where it's not filled
 					for (int index = left[numIndex] + num; index <= right[numIndex] - num; index++) {
-						if (line[index] == 0) {
+						if (line[index] == 2) {
 							if (theresRoom(index, num, 1)) {
 								for (int i = index; i < index + num; i++) {
 									possibilities[i].mayBeFilled();
@@ -153,7 +153,7 @@ public class PicrossSolverLine {
 					}
 					//max is ambiguous
 					for (int i = right[numIndex] - num + 1; i <= right[numIndex]; i++) {
-						if (line[i] == 0) {
+						if (line[i] == 2) {
 							possibilities[i].mayBeFilled();
 							possibilities[i].mayBeEmpty();
 						}
@@ -162,14 +162,14 @@ public class PicrossSolverLine {
 					//min and max overlap
 					//write it all as ambiguous
 					for (int i = left[numIndex]; i <= right[numIndex]; i++) {
-						if (line[i] == 0) {
+						if (line[i] == 2) {
 							possibilities[i].mayBeFilled();
 							possibilities[i].mayBeEmpty();
 						}
 					}
 					//rewrite the overlapping portion
 					for (int i = right[numIndex] - num + 1; i <= left[numIndex] + num - 1; i++) {
-						if (line[i] == 0) {
+						if (line[i] == 2) {
 							possibilities[i].cantBeEmpty();
 						}
 					}
@@ -189,20 +189,20 @@ public class PicrossSolverLine {
 				Boolean cbFilled = possibilities[i].getFilled();
 				Boolean cbEmpty = possibilities[i].getEmpty();
 				if (Boolean.TRUE.equals(cbFilled) && Boolean.TRUE.equals(cbEmpty)) {
-					//confirmed we don't know which yet
-					newline[i] = 0;
+					//we don't know which yet
+					newline[i] = 2;
 				} else if (Boolean.TRUE.equals(cbFilled)) {
 					//confirm fill whether Empty is deconfirmed or uninitialized
 					newline[i] = 1;
 				} else if (Boolean.TRUE.equals(cbEmpty)) {
 					//confirm empty whether Filled is deconfirmed or uninitialized
-					newline[i] = 2;
+					newline[i] = 0;
 				} else if (Boolean.FALSE.equals(cbFilled) && Boolean.FALSE.equals(cbEmpty)) {
 					//if both are deconfirmed then there is a contradiction in the logic
 					throw new RuntimeException();
 				} else if (Boolean.FALSE.equals(cbFilled)) {
 					//deconfirmed Filled, while Empty uninitialized, can say empty
-					newline[i] = 2;
+					newline[i] = 0;
 				} else if (Boolean.FALSE.equals(cbEmpty)) {
 					//deconfirmed Empty, while Filled uninitialized, can say empty
 					newline[i] = 1;
@@ -229,7 +229,7 @@ public class PicrossSolverLine {
 			}
 			//are all the requred spaces not crossed?
 			for (int i = index; i != index + num * dir; i += dir) {
-				if (line[i] == 2) {
+				if (line[i] == 0) {
 					return false;
 				}
 			}
