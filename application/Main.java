@@ -144,7 +144,7 @@ public class Main extends Application {
 				"empty. As you fill in and cross out squares in one row or " +
 				"column, more information is obtained about the perpendicular " +
 				"column or row.\n	\"Guess-and-check\" or \"if-then\" logic should not " +
-				"be necessary to solve a well-designed nonogram. The solver embedded " + 
+				"be necessary to solve a well-designed nonogram. The solver " + 
 				"in Nonogrammatica will determine if the puzzle you draw or provide" + 
 				"is solvable, so long as this is not necessary to solve.\n\n" +
 				"	Some descriptions of techniques to solve are embedded below:\n ");
