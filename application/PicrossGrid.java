@@ -7,8 +7,10 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.Writer;
+import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.Scanner;
+import java.util.stream.Collectors;
 
 import javax.imageio.ImageIO;
 
@@ -22,9 +24,11 @@ import javafx.scene.input.KeyCode;
 import javafx.scene.layout.ColumnConstraints;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Pane;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.RowConstraints;
 import javafx.scene.layout.VBox;
+import javafx.scene.text.Text;
 import javafx.scene.text.TextAlignment;
 
 public class PicrossGrid extends GridPane {
@@ -458,6 +462,77 @@ public class PicrossGrid extends GridPane {
 					pointersToPanes[c][r].setFilled();
 				} 
 			}
+		}
+	}
+	
+	//display the header numbers for each row and column
+	class PicrossText extends Text {
+		private String separator;
+		private int[] nums;
+		
+		public PicrossText(int[] nums, String separator) {
+			this.separator = separator;
+			updateText(nums);
+		}
+		
+		public void updateText(int[] blocks) {
+			this.nums = blocks;
+			String newText = Arrays.stream(blocks)
+					.mapToObj(String::valueOf)
+					.collect(Collectors.joining(separator));
+			if (separator == " ") {
+				setText(newText + "\u2009");
+			} else {
+				setText(newText);
+			}
+		}
+		
+		public int[] getNums() {
+			return nums;
+		}
+	}
+	
+	//squares of the grid to fill in
+	class PicrossPane extends Pane {
+		private int col;
+		private int row;
+		private boolean filled;
+		
+		public PicrossPane(int col, int row) {
+			this.col = col;
+			this.row = row;
+			getStyleClass().add("cell");
+		}
+		
+		public int getCol() {
+			return col;
+		}
+		
+		public int getRow() {
+			return row;
+		}
+		
+		//need to remove before adding so that css tags are not added multiple times
+		public void setFilled() {
+			getStyleClass().remove("clear");
+			getStyleClass().remove("filled");
+			getStyleClass().add("filled");
+			filled = true;
+		}
+		
+		public void clear() {
+			getStyleClass().remove("filled");
+			getStyleClass().remove("clear");
+			getStyleClass().add("clear");
+			filled = false;
+		}
+		
+		public boolean filled() {
+			return filled;
+		}
+		
+		public void setUnknown() {
+			getStyleClass().add("unknown");
 		}
 	}
 }
