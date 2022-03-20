@@ -32,17 +32,17 @@ import javafx.scene.text.Text;
 import javafx.scene.text.TextAlignment;
 
 public class PicrossGrid extends GridPane {
-	private PicrossPane[][] pointersToPanes;
-	private PicrossText[] pointersToTexts;
+	private final PicrossPane[][] pointersToPanes;
+	private final PicrossText[] pointersToTexts;
 	private PicrossPane current;
 	private KeyCode state = KeyCode.SPACE;
 	private KeyCode direction = KeyCode.SPACE;
 	private boolean justMoved = false;
 	private boolean unsavedChanges = false;
-	private int numCols;
-	private int numRows;
+	private final int numCols;
+	private final int numRows;
 	private int mult;
-	private int cellSize = 18;
+	private final int cellSize = 18;
 	public PicrossGrid(int numCols, int numRows, boolean editing) {
 		this.numCols = numCols;
 		this.numRows = numRows;
@@ -70,11 +70,10 @@ public class PicrossGrid extends GridPane {
 		getRowConstraints().add(columnLabels);
 		
 		//add column heights and numbers
-		int[] startZero = {0};
 		ColumnConstraints columnGrid = new ColumnConstraints(cellSize);
 		for (int i = 1; i < numCols + 1; i++) {
 			getColumnConstraints().add(columnGrid);
-			PicrossText nums = new PicrossText(startZero, "\n");
+			PicrossText nums = new PicrossText("\n");
 			nums.setTextAlignment(TextAlignment.CENTER);
 			pointersToTexts[i - 1] = nums;
 			VBox labelCell = new VBox(nums);
@@ -83,9 +82,8 @@ public class PicrossGrid extends GridPane {
 			
 			//thick border every 5
 			labelCell.getStyleClass().add("nums");
-			if (i % 5 == 1) {
-				labelCell.getStyleClass().add("after-fifth-column");
-			}
+			if (i % 5 == 1) {labelCell.getStyleClass().add("after-fifth-column");}
+            
 			add(labelCell, i, 0);
 		}
 		
@@ -93,7 +91,7 @@ public class PicrossGrid extends GridPane {
 		RowConstraints rowGrid = new RowConstraints(cellSize);
 		for (int i = 1; i < numRows + 1; i++) {
 			getRowConstraints().add(rowGrid);
-			PicrossText nums = new PicrossText(startZero, " ");
+			PicrossText nums = new PicrossText(" ");
 			pointersToTexts[numCols + i - 1] = nums;
 			HBox labelCell = new HBox(nums);
 			setHgrow(labelCell, Priority.ALWAYS);
@@ -101,9 +99,7 @@ public class PicrossGrid extends GridPane {
 			
 			//thick border every 5
 			labelCell.getStyleClass().add("nums");
-			if (i % 5 == 1) {
-				labelCell.getStyleClass().add("after-fifth-row");
-			}
+			if (i % 5 == 1) {labelCell.getStyleClass().add("after-fifth-row");}
 			
 			add(labelCell, 0, i);
 		}
@@ -114,12 +110,8 @@ public class PicrossGrid extends GridPane {
 				PicrossPane cell = new PicrossPane(c, r);
 				
 				//thick borders every 5
-				if (c % 5 == 1) {
-					cell.getStyleClass().add("after-fifth-column");
-				}
-				if (r % 5 == 1) {
-					cell.getStyleClass().add("after-fifth-row");
-				}
+				if (c % 5 == 1) {cell.getStyleClass().add("after-fifth-column");}
+				if (r % 5 == 1) {cell.getStyleClass().add("after-fifth-row");}
 				
 				//allow change of cursor by clicking
 				if (editing) {
@@ -190,7 +182,7 @@ public class PicrossGrid extends GridPane {
 	
 	//change label of a column
 	private void updateLabelsCol(int currentCol) {
-		LinkedList<Integer> colNums = new LinkedList<Integer>();
+		LinkedList<Integer> colNums = new LinkedList<>();
 		int tempBlock = 0;
 		for (int r = 1; r <= numRows; r++) {
 			if (pointersToPanes[currentCol][r].filled()) {
@@ -217,7 +209,7 @@ public class PicrossGrid extends GridPane {
 	
 	//change label of a row
 	private void updateLabelsRow(int currentRow) {
-		LinkedList<Integer> rowNums = new LinkedList<Integer>();
+		LinkedList<Integer> rowNums = new LinkedList<>();
 		int tempBlock = 0;
 		for (int c = 1; c <= numCols; c++) {
 			if (pointersToPanes[c][currentRow].filled()) {
@@ -292,15 +284,13 @@ public class PicrossGrid extends GridPane {
 	private void move() {
 		int currentCol = current.getCol();
 		int currentRow = current.getRow();
-		if (direction == KeyCode.RIGHT || direction == KeyCode.KP_RIGHT) {
-			moveCursor(currentCol + 1, currentRow);
-		} else if (direction == KeyCode.DOWN || direction == KeyCode.KP_DOWN) {
-			moveCursor(currentCol, currentRow + 1);
-		} else if (direction == KeyCode.LEFT || direction == KeyCode.KP_LEFT) {
-			moveCursor(currentCol - 1, currentRow);
-		} else if (direction == KeyCode.UP || direction == KeyCode.KP_UP) {
-			moveCursor(currentCol, currentRow - 1);
-		}
+		if (direction != null) switch (direction) {
+            case RIGHT, KP_RIGHT -> moveCursor(currentCol + 1, currentRow);
+            case DOWN, KP_DOWN ->   moveCursor(currentCol, currentRow + 1);
+            case LEFT, KP_LEFT ->   moveCursor(currentCol - 1, currentRow);
+            case UP, KP_UP ->       moveCursor(currentCol, currentRow - 1);
+            default -> {}
+        }
 	}
 	
 	//change current cell
@@ -333,9 +323,8 @@ public class PicrossGrid extends GridPane {
 	
 	//save progress for later
 	public void saveWork(File file) {
-		try {
+		try (Writer writer = new BufferedWriter(new FileWriter(file))) {
 			//first row is dimensions and dummy filler x's
-			Writer writer = new BufferedWriter(new FileWriter(file));
 			writer.write(numCols + "," + numRows);
 			for (int c = 1; c <= numCols - 2; c++) {
 				writer.write(",x");
@@ -366,9 +355,8 @@ public class PicrossGrid extends GridPane {
 	
 	//resume progress from file
 	public boolean resumeWork(File file) {
-		try {
+		try (Scanner scanner = new Scanner(file)) {
 			//open and skip row and col numbers
-			Scanner scanner = new Scanner(file);
 			scanner.useDelimiter(",|\\n");
 			for (int c = 1; c <= numCols; c++) {
 				scanner.next();
@@ -377,12 +365,12 @@ public class PicrossGrid extends GridPane {
 			//fill in cells from save data
 			for (int r = 1; r <= numRows; r++) {
 				for (int c = 1; c <= numCols; c++) {
-					String next = scanner.next();
-					if (next.trim().equals("1")) {
+					String next = scanner.next().trim();
+					if (next.equals("1")) {
 						pointersToPanes[c][r].setFilled();
-					} else if (next.trim().equals("2")) {
+					} else if (next.equals("2")) {
 						pointersToPanes[c][r].setUnknown();
-					} else if (!next.trim().equals("0")) {
+					} else if (!next.equals("0")) {
 						scanner.close();
 						return false;
 					}
@@ -467,20 +455,25 @@ public class PicrossGrid extends GridPane {
 	
 	//display the header numbers for each row and column
 	class PicrossText extends Text {
-		private String separator;
+		private final String separator;
 		private int[] nums;
 		
-		public PicrossText(int[] nums, String separator) {
+		public PicrossText(String separator) {
 			this.separator = separator;
-			updateText(nums);
+            if (separator.equals(" ")) {
+                setText("0\u2009");
+            } else {
+                setText("0");
+            }
+            nums = new int[] {0};
 		}
 		
-		public void updateText(int[] blocks) {
-			this.nums = blocks;
-			String newText = Arrays.stream(blocks)
+		public void updateText(int[] nums) {
+			this.nums = nums;
+			String newText = Arrays.stream(nums)
 					.mapToObj(String::valueOf)
 					.collect(Collectors.joining(separator));
-			if (separator == " ") {
+			if (separator.equals(" ")) {
 				setText(newText + "\u2009");
 			} else {
 				setText(newText);
@@ -494,8 +487,8 @@ public class PicrossGrid extends GridPane {
 	
 	//squares of the grid to fill in
 	class PicrossPane extends Pane {
-		private int col;
-		private int row;
+		private final int col;
+		private final int row;
 		private boolean filled;
 		
 		public PicrossPane(int col, int row) {

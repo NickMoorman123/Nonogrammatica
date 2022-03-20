@@ -2,8 +2,6 @@ package application;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.IOException;
 import java.io.InputStream;
 import java.util.Arrays;
 import java.util.Scanner;
@@ -102,20 +100,6 @@ public class Main extends Application {
 		}
 	}
 	
-	//back to start
-	public void backHome(Stage stage) {
-		try {
-			stage.setHeight(400);
-			stage.setMinHeight(400);
-			stage.setWidth(400);
-			stage.setMinWidth(400);
-			start(stage);
-			
-		} catch(Exception e) {
-			e.printStackTrace();
-		}
-	}
-	
 	//description of what nonograms are
 	public void about(Stage stage) {
 		try {
@@ -128,7 +112,7 @@ public class Main extends Application {
 			//button to get to home screen
 			Button btnBack = new Button("Back");
 			btnBack.setOnAction(e -> {
-				backHome(stage);
+				start(stage);
 			});
 			btnBack.setAlignment(Pos.CENTER_LEFT);
 			HBox header = new HBox(btnBack);
@@ -164,7 +148,6 @@ public class Main extends Application {
 			//Display
 			Scene settings = new Scene(root);
 			stage.setScene(settings);
-			stage.show();
 			
 			//Deselect all buttons
 			root.requestFocus();
@@ -185,7 +168,7 @@ public class Main extends Application {
 			
 			Button btnBack = new Button("Back");
 			btnBack.setOnAction(e -> {
-				backHome(stage);
+				start(stage);
 			});
 			btnBack.setAlignment(Pos.CENTER_LEFT);
 			
@@ -210,7 +193,7 @@ public class Main extends Application {
 			buttons.setPadding(new Insets(10,10,10,10));
 			
 			//tell user what to do
-			String direct = new String("Input width and height.");
+			String direct = "Input width and height.";
 			if (drawing) {
 				direct = direct + "\nMultiples of 5 are recommended for readability.";
 			}
@@ -318,7 +301,6 @@ public class Main extends Application {
 			
 			Scene settings = new Scene(root);
 			stage.setScene(settings);
-			stage.show();
 			
 			widthField.requestFocus();
 			
@@ -374,7 +356,7 @@ public class Main extends Application {
 			
 			Button btnCheck = new Button("Check Solvability");
 			btnCheck.setOnAction(e -> {
-				checkSolvability(picross.getLabels());
+				displaySolvability(picross.getLabels());
 				picross.requestFocus();
 			});
 			
@@ -405,9 +387,8 @@ public class Main extends Application {
 			
 			stage.setScene(creator);
 			stage.sizeToScene();
-			stage.setHeight(Math.min(stage.getHeight() + 20, 600));
-			stage.setWidth(Math.min(stage.getWidth() + 20, 600));
-			stage.show();
+			stage.setHeight(Math.min(Math.max(stage.getHeight(), 400), 600));
+			stage.setWidth(Math.min(Math.max(stage.getWidth(), 400), 600));
 			
 			picross.timer.start();
 			
@@ -421,90 +402,85 @@ public class Main extends Application {
 	}
 	
 	//new window with results of solver
-	public void checkSolvability(int[][][] labels) {
-		Stage secondaryStage = new Stage();
-		secondaryStage.setHeight(650);
-		secondaryStage.setMinHeight(650);
-		secondaryStage.setWidth(650);
-		secondaryStage.setMinWidth(650);
-		
-		PicrossSolver solver = new PicrossSolver(labels);
-		File answer = null;
-		try {
-			answer = File.createTempFile("temp", ".csv");
-		} catch (IOException ex) {
-			ex.printStackTrace();
-		}
-		solver.getResult(answer);
-		
-		Scanner scanner = null;
-		try {
-			scanner = new Scanner(answer);
-		} catch (FileNotFoundException ex) {
-			ex.printStackTrace();
-		}
-		scanner.useDelimiter(",|\\n");
+	public void displaySolvability(int[][][] labels) {
+        try {
+            Stage secondaryStage = new Stage();
+            secondaryStage.setHeight(650);
+            secondaryStage.setMinHeight(650);
+            secondaryStage.setWidth(650);
+            secondaryStage.setMinWidth(650);
 
-		BorderPane check = new BorderPane();
-		Label result = new Label();
-		result.setTextAlignment(TextAlignment.CENTER);
-		result.setPadding(new Insets(10,10,10,10));
-		check.setTop(result);
-		
-		Pane Hspacer = new Pane();
-		HBox.setHgrow(Hspacer, Priority.ALWAYS);
-		
-		PicrossGrid picturePicross = new PicrossGrid(Integer.parseInt(scanner.next()), Integer.parseInt(scanner.next()), false);
-		picturePicross.getStylesheets().add(getClass().getResource("picross.css").toExternalForm());
-		picturePicross.resumeWork(answer);
-		
-		ScrollPane scrollPicturePicross = new ScrollPane(new Group(picturePicross));
-		check.setCenter(scrollPicturePicross);
-		
-		HBox buttons;
-		
-		if (solver.solvable()) {
-			result.setText("Solvable! Do you want to export the puzzle to .png?");
-			
-			FileChooser fileChooser = new FileChooser();
-			fileChooser.setTitle("Select a Save Location");
-			fileChooser.getExtensionFilters().add(new ExtensionFilter("PNG Files", "*.png"));
-			
-			Button btnEUnsolved = new Button("Export Unsolved");
-			btnEUnsolved.setOnAction(ex -> {
-				File unsolvedPuzzle = fileChooser.showSaveDialog(secondaryStage);
-				picturePicross.exportUnsolved(unsolvedPuzzle);
-			});
-			
-			Pane spacer = new Pane();
-			HBox.setHgrow(spacer, Priority.ALWAYS);
-			
-			Button btnESolved = new Button("Export Solved");
-			btnESolved.setOnAction(ex -> {
-				File solvedPuzzle = fileChooser.showSaveDialog(secondaryStage);
-				picturePicross.export(solvedPuzzle);
-			});
-			
-			buttons = new HBox(btnEUnsolved, spacer, btnESolved);
-		} else {
-			result.setText("Not Solvable!");
-			picturePicross.overrideLabels(labels);
-			
-			Button btnOK = new Button("OK");
-			btnOK.setOnAction(ex -> {
-				secondaryStage.close();
-			});
-			btnOK.setPadding(new Insets(10,10,10,10));
-			check.setBottom(btnOK);
-			
-			buttons = new HBox(btnOK);
-		}
-		buttons.setPadding(new Insets(10,10,10,10));
-		check.setBottom(buttons);
-		
-		Scene secondaryScene = new Scene(check);
-		secondaryStage.setScene(secondaryScene);
-		secondaryStage.show();
+            PicrossSolver solver = new PicrossSolver(labels);
+            File answer = File.createTempFile("temp", ".csv");
+            solver.getResult(answer);
+
+            Scanner scanner = new Scanner(answer);
+            scanner.useDelimiter(",|\\n");
+
+
+            BorderPane check = new BorderPane();
+            Label result = new Label();
+            result.setTextAlignment(TextAlignment.CENTER);
+            result.setPadding(new Insets(10,10,10,10));
+            check.setTop(result);
+
+            Pane Hspacer = new Pane();
+            HBox.setHgrow(Hspacer, Priority.ALWAYS);
+
+            PicrossGrid picturePicross = new PicrossGrid(Integer.parseInt(scanner.next()), Integer.parseInt(scanner.next()), false);
+            picturePicross.getStylesheets().add(getClass().getResource("picross.css").toExternalForm());
+            picturePicross.resumeWork(answer);
+
+            ScrollPane scrollPicturePicross = new ScrollPane(new Group(picturePicross));
+            check.setCenter(scrollPicturePicross);
+
+            HBox buttons;
+
+            if (solver.solvable()) {
+                result.setText("Solvable! Do you want to export the puzzle to .png?");
+
+                FileChooser fileChooser = new FileChooser();
+                fileChooser.setTitle("Select a Save Location");
+                fileChooser.getExtensionFilters().add(new ExtensionFilter("PNG Files", "*.png"));
+
+                Button btnEUnsolved = new Button("Export Unsolved");
+                btnEUnsolved.setOnAction(ex -> {
+                    File unsolvedPuzzle = fileChooser.showSaveDialog(secondaryStage);
+                    picturePicross.exportUnsolved(unsolvedPuzzle);
+                });
+
+                Pane spacer = new Pane();
+                HBox.setHgrow(spacer, Priority.ALWAYS);
+
+                Button btnESolved = new Button("Export Solved");
+                btnESolved.setOnAction(ex -> {
+                    File solvedPuzzle = fileChooser.showSaveDialog(secondaryStage);
+                    picturePicross.export(solvedPuzzle);
+                });
+
+                buttons = new HBox(btnEUnsolved, spacer, btnESolved);
+            } else {
+                result.setText("Not Solvable!");
+                picturePicross.overrideLabels(labels);
+
+                Button btnOK = new Button("OK");
+                btnOK.setOnAction(ex -> {
+                    secondaryStage.close();
+                });
+                btnOK.setPadding(new Insets(10,10,10,10));
+                check.setBottom(btnOK);
+
+                buttons = new HBox(btnOK);
+            }
+            buttons.setPadding(new Insets(10,10,10,10));
+            check.setBottom(buttons);
+
+            Scene secondaryScene = new Scene(check);
+            secondaryStage.setScene(secondaryScene);
+            secondaryStage.show();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
 	}
 	
 	//if save data could not be loaded
@@ -531,7 +507,6 @@ public class Main extends Application {
 		
 		Scene confirm = new Scene(fail);
 		stage.setScene(confirm);
-		stage.show();
 	}
 	
 	//be sure user wants to go back if saved work
@@ -631,7 +606,6 @@ public class Main extends Application {
 		root.setBottom(HBNext);
 		
 		stage.setScene(solve);
-		stage.show();
 		
 		Platform.runLater(()->pointersToRowFields[0].requestFocus());
 	}
@@ -689,7 +663,7 @@ public class Main extends Application {
 			boolean acceptAll = validateInputs(pointersToColErrors, pointersToColFields, newColLabels, numRows, false);
 			if (acceptAll) {
 				int [][][] labels = {newColLabels, rowLabels};
-				checkSolvability(labels);
+				displaySolvability(labels);
 			}
 		});
 		HBox HBSubmit = new HBox(btnSubmit);
@@ -698,7 +672,6 @@ public class Main extends Application {
 		root.setBottom(HBSubmit);
 		
 		stage.setScene(solve);
-		stage.show();
 		
 		Platform.runLater(()->pointersToColFields[0].requestFocus());
 	}
@@ -785,7 +758,7 @@ public class Main extends Application {
 				}
 			}
 			
-			if (num == "") {
+			if (num.equals("")) {
 				errors[i].setText("Please review this entry. ");
 				inputs[i].setStyle("-fx-text-fill: red;");
 				accept = false;
