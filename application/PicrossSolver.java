@@ -1,136 +1,77 @@
-package application;
-
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.Writer;
+import java.util.ArrayList;
 import java.util.Arrays;
 
+import javafx.concurrent.Task;
+
 public class PicrossSolver {
+    private final static boolean enableDebug = true;
 	private final int[][] colHeaders;
 	private final int[][] rowHeaders;
 	private final int numCols;
 	private final int numRows;
-	private final int[][] grid;
+	private final int[][] intGrid;
+    private final int[][] solution;
+    private final PicrossGrid picrossGrid;
+    private final int emptyCell = 2;
+    private final int filledCell = 1;
+    private final int crossedCell = 0;
 	private boolean impossible = false;
-	public PicrossSolver(int[][][] headers) {
+
+	public PicrossSolver(int[][][] headers, int[][] solution, PicrossGrid picrossGrid) {
+        if (headers == null) {
+            colHeaders = null;
+		    rowHeaders = null;
+            numCols = 0;
+            numRows = 0;
+            intGrid = null;
+            this.solution = null;
+            this.picrossGrid = null;
+            runTests();
+            return;
+        }
 		colHeaders = headers[0];
 		rowHeaders = headers[1];
 		numCols = colHeaders.length;
 		numRows = rowHeaders.length;
-		grid = new int[numCols][numRows];
+		intGrid = new int[numCols][numRows];
+        this.solution = solution;
+        this.picrossGrid = picrossGrid;
 		for (int c = 0; c < numCols; c++) {
 			for (int r = 0; r < numRows; r++) {
-				grid[c][r] = 2;
+				intGrid[c][r] = emptyCell;
 			}
 		}
-		
-		iterate();
+        debug("Create solver on " + numCols + " columns and " + numRows + " rows");
 	}
-	
-	//loop over all rows and columns until the loop when
-	//no changes have been made
-	private void iterate() {
-		try {
-			boolean changed;
-			do {
-				changed = false;
-				for (int c = 0; c < numCols; c++) {
-					if (colUpdate(c)) {
-						changed = true;
-					}
-				}
-				for (int r = 0; r < numRows; r++) {
-					if (rowUpdate(r)) {
-						changed = true;
-					}
-				}
-			} while (changed);
-		} catch(Exception e) {
-			impossible = true;
-		}
-	}
-	
-	//look for changes to make to a column
-	private boolean colUpdate(int col) throws Exception {
-        boolean changed = false;
 
-        //get current state
-        int[] line = grid[col].clone();
-
-        //determine any new info
-        PicrossSolverLine solver = new PicrossSolverLine(line, colHeaders[col]);
-        int[] newline = solver.attempt();
-
-        //post new info and call the perpendiculars
-        boolean[] rowsToUpdate = new boolean[numRows];
-        Arrays.fill(rowsToUpdate, false);
-        for (int r = 0; r < numRows; r++) {
-            if (newline[r] != line[r]) {
-                if (line[r] == 2) {
-                    grid[col][r] = newline[r];
-                    changed = true;
-                    rowsToUpdate[r] = true;
-                } else {
-                    //should not be rewriting or erasing
-                    return (Boolean) null;
-                }
+    //Perform calculations on a separate thread to not lag the UI thread
+    public void solve() {
+		new Thread() {
+            public void run() {
+                //The delay is only to allow for the second window to show before the solver starts going
+                try {
+                    sleep(450);
+                } catch (Exception e) {}
+                iterate();
             }
-        }
-        for (int r = 0; r < numRows; r++) {
-            if (rowsToUpdate[r]) {
-                rowUpdate(r);
-            }
-        }
-
-        return changed;
-	}
-	
-	//look for changes to make to a row
-	private boolean rowUpdate(int row) throws Exception {
-        boolean changed = false;
-
-        //get current state
-        int[] line = new int[numCols];
-        for (int c = 0; c < numCols; c++) {
-            line[c] = grid[c][row];
-        }
-
-        //determine any new info
-        PicrossSolverLine solver = new PicrossSolverLine(line, rowHeaders[row]);
-        int[] newline = solver.attempt();
-
-        //post new info and call the perpendiculars
-        boolean[] colsToUpdate = new boolean[numCols];
-        Arrays.fill(colsToUpdate, false);
-        for (int c = 0; c < numCols; c++) {
-            if (newline[c] != line[c]) {
-                if (line[c] == 2) {
-                    grid[c][row] = newline[c];
-                    changed = true;
-                    colsToUpdate[c] = true;
-                } else {
-                    return (Boolean) null;
-                }	
-            } 
-        }
-        for (int c = 0; c < numCols; c++) {
-            if (colsToUpdate[c]) {
-                colUpdate(c);
-            }
-        }
-
-        return changed;
-	}
+        }.start();
+    }
 	
 	//get whether it is solvable
 	public boolean solvable() {
-		if (impossible) {
+        debug("Checking solvability");
+        iterate();
+
+        if (impossible) {
 			return false;
 		}
 		for (int c = 0; c < numCols; c++) {
 			for (int r = 0; r < numRows; r++) {
-				if (grid[c][r] == 2) {
+				if (intGrid[c][r] == emptyCell) {
 					return false;
 				}
 			}
@@ -138,27 +79,148 @@ public class PicrossSolver {
 		return true;
 	}
 	
-	//give end result
-	public void getResult(File file) throws Exception {
-        //first row is dimensions and dummy filler x's
-        Writer writer = new BufferedWriter(new FileWriter(file));
-        writer.write(numCols + "," + numRows);
-        for (int c = 1; c <= numCols - 2; c++) {
-            writer.write(",x");
-        }
-        writer.write("\n");
-
-        //bitmap from picross
-        for (int r = 0; r < numRows; r++) { 
-            String[] row = new String[numCols];
-            for (int c = 0; c < numCols; c++) { 
-                row[c] = "" + grid[c][r];
+	//loop over all rows and columns until the loop when
+	//no changes have been made
+	private void iterate() {
+		try {
+            //get immediate easy information from all rows and cols
+			boolean foundInformation = false;
+            for (int c = 0; c < numCols; c++) {
+                if (colUpdate(c, false)) {
+                    foundInformation = true;
+                }
             }
-            writer.write(String.join(",", row) + "\n");
+            for (int r = 0; r < numRows; r++) {
+                if (rowUpdate(r, false)) {
+                    foundInformation = true;
+                }
+            }
+
+            //check rows and cols again, this time jumping around when something is updated
+			while (foundInformation) {
+				foundInformation = false;
+				for (int c = 0; c < numCols; c++) {
+					if (colUpdate(c, true)) {
+						foundInformation = true;
+					}
+				}
+				for (int r = 0; r < numRows; r++) {
+					if (rowUpdate(r, true)) {
+						foundInformation = true;
+					}
+				}
+			}
+		} catch(Exception e) {
+            debug("Exiting due to impossibility: " + e);
+			impossible = true;
+		}
+	}
+	
+	//look for changes to make to a column
+	private boolean colUpdate(int col, boolean doPerpendiculars) throws Exception {
+        debug("Try to update column " + col);
+        boolean changed = false;
+
+        //get current state
+        int[] line = intGrid[col].clone();
+
+        //determine any new info
+        int[] newline = (new PicrossSolverLine(line, colHeaders[col])).getNewLine();
+
+        //post new info and call the perpendiculars
+        boolean[] rowsToUpdate = new boolean[numRows];
+        Arrays.fill(rowsToUpdate, false);
+        for (int r = 0; r < numRows; r++) {
+            if (newline[r] != line[r]) {
+                if (line[r] == emptyCell) {
+                    if (enableDebug && solution != null && 
+                        ((newline[r] == crossedCell && solution[col][r] != 0) || (newline[r] == filledCell && solution[col][r] != 1))) {
+                        //we got something wrong
+                        debug("Throwing exception. Got cell " + r + " on column " + col + " wrong. Line: " + Arrays.toString(line) + 
+                            " Nums: " + Arrays.toString(colHeaders[col]) + " Newline: " + Arrays.toString(newline));
+                        throw new Exception();
+                    }
+                    intGrid[col][r] = newline[r];
+                    changed = true;
+                    rowsToUpdate[r] = true;
+                    if (newline[r] == filledCell) {
+                        picrossGrid.fillCell(col, r);
+                    } else {
+                        picrossGrid.clearCell(col, r);
+                    }
+                } else {
+                    //should not be rewriting or erasing
+                    debug("Throwing exception. Tried to overwrite cell " + r + " of column " + col);
+                    throw new Exception();
+                }
+            }
         }
 
-        writer.flush();
-        writer.close();
+        if (doPerpendiculars) {
+            debug("Will update rows due to changes on column " + col + ": " + Arrays.toString(rowsToUpdate));
+            for (int r = 0; r < numRows; r++) {
+                if (rowsToUpdate[r]) {
+                    rowUpdate(r, true);
+                }
+            }
+        }
+
+        return changed;
+	}
+	
+	//look for changes to make to a row
+	private boolean rowUpdate(int row, boolean doPerpendiculars) throws Exception {
+        debug("Try to update row " + row);
+        boolean changed = false;
+
+        //get current state
+        int[] line = new int[numCols];
+        for (int c = 0; c < numCols; c++) {
+            line[c] = intGrid[c][row];
+        }
+
+        //determine any new info
+        int[] newline = (new PicrossSolverLine(line, rowHeaders[row])).getNewLine();
+
+        //post new info and call the perpendiculars
+        boolean[] colsToUpdate = new boolean[numCols];
+        Arrays.fill(colsToUpdate, false);
+        for (int c = 0; c < numCols; c++) {
+            if (newline[c] != line[c]) {
+                if (line[c] == emptyCell) {
+                    if (enableDebug && solution != null && 
+                        ((newline[c] == crossedCell && solution[c][row] != 0) || (newline[c] == filledCell && solution[c][row] != 1))) {
+                        //we got something wrong
+                        debug("Throwing exception. Got cell " + c + " on row " + row + " wrong. Line: " + Arrays.toString(line) + 
+                            " Nums: " + Arrays.toString(rowHeaders[row]) + " Newline: " + Arrays.toString(newline));
+                        throw new Exception();
+                    }
+                    intGrid[c][row] = newline[c];
+                    changed = true;
+                    colsToUpdate[c] = true;
+                    if (newline[c] == filledCell) {
+                        picrossGrid.fillCell(c, row);
+                    } else {
+                        picrossGrid.clearCell(c, row);
+                    }
+                } else {
+                    //should not be rewriting or erasing
+                    debug("Throwing exception. Tried to overwrite cell " + c + " of row " + row);
+                    throw new Exception();
+                }	
+            } 
+        }
+
+        if (doPerpendiculars) {
+            debug("Will update cols due to changes on row " + row + ": " + Arrays.toString(colsToUpdate));
+            for (int c = 0; c < numCols; c++) {
+                if (colsToUpdate[c]) {
+                    colUpdate(c, true);
+                }
+            }
+        }
+
+        return changed;
 	}
 	
 	//used to glean any new info on a line
@@ -166,274 +228,611 @@ public class PicrossSolver {
 		private final int[] line;
 		private final int[] nums;
 		private final int len;
-		private final int numsLen;
+		private final int countNums;
+        private PicrossSolverLineSection[] sections;
+        private int countSections;
+        private int[] distribution;
+        private boolean empty = false;
+
 		public PicrossSolverLine(int[] line, int[] nums) {
-			this.line = line;
+            this.line = line;
 			this.nums = nums;
 			len = line.length;
-			numsLen = nums.length;
-		}
-		
-		//find possibilities based on new info
-		public int[] attempt() throws Exception {
+			countNums = nums.length;
+            debug("Given line " + Arrays.toString(line) + " and nums " + Arrays.toString(nums));
             if (nums[0] == 0) {
-                int[] newline = new int[len];
-                Arrays.fill(newline, 0);
-                return newline;
-            } else {
-                //furthest left/up possibility
-                int[] leftExtreme = getExtreme(1);
-                //furthest right/down possibility
-                int[] rightExtreme = getExtreme(-1);
-
-                return getNewInfo(leftExtreme, rightExtreme);
-            }
-		}
-		
-		private int[] getExtreme(int dir) throws Exception {
-            int index;
-            int numIndex;
-            int extreme[] = new int[numsLen];
-
-            //set up start positions
-            if (dir == 1) {
-                index = 0;
-                numIndex = 0;
-            } else {
-                index = len - 1;
-                numIndex = numsLen - 1;
-            }
-            while (numIndex >= 0 && numIndex < numsLen) {
-                int num = nums[numIndex];
-                //check that there's room
-                while (!theresRoom(index, num, dir)) {
-                    index += dir;
-                }
-                //take down left/right index of the num-block location
-                extreme[numIndex] = index;
-                //update indeces
-                numIndex += dir;
-                index += (num + 1) * dir;
-                if (index < 0 || index > len) {
-                    index -= dir;
-                }
-            }
-            //keep going to end
-            while (index >= 0 && index < len) {
-                index += dir;
-            }
-            //go backwards and shift blocks as needed to cover 
-            //any existing filled squares
-            index -= dir;
-            numIndex -= dir;
-            while (numIndex >= 0 && numIndex < numsLen) {
-                int num = nums[numIndex];
-                //find a spot where the possibility doesn't cover an
-                //existing filled cell
-                for (int i = index; i != extreme[numIndex] + ((num - 1) * dir); i -= dir) {
-                    if (line[i] == 1) {
-                        //may need to backtrack to cover the spot
-                        while (!theresRoom(i, num, -dir)) {
-                            i += dir;
-                        }
-                        extreme[numIndex] = i + ((num - 1) * -dir);
-                        break;
-                    }
-                }
-                index = extreme[numIndex] - dir;
-                numIndex -= dir;
-            }
-            //check that we did not move something off of an 
-            //existing colored in cell
-            while (index >= 0 && index < len) {
-                if (line[index] == 1) {
-                    return null;
-                }
-                index -= dir;
+                empty = true;
+                debug("Line is confimed crossed out");
+                return;
             }
 
-            return extreme;
-		}
-		
-		private int[] getNewInfo(int[] left, int[] right) throws Exception {
-            PicrossSolverSquare[] possibilities = new PicrossSolverSquare[len];
-
-            //what we know from original info
-            for (int i = 0; i < len; i++) {
-                possibilities[i] = new PicrossSolverSquare();
-                if (line[i] == 1) {
-                    possibilities[i].alreadyFilled();
-                } else if (line[i] == 0) {
-                    possibilities[i].alreadyEmpty();
-                }
-            }
-
-            //edges outside the extremes
-            for (int i = 0; i < left[0]; i++) {
-                possibilities[i].cantBeFilled();
-                possibilities[i].mayBeEmpty();
-            }
-            for (int i = right[numsLen - 1] + 1; i < len; i++) {
-                possibilities[i].cantBeFilled();
-                possibilities[i].mayBeEmpty();
-            }
-            //add possibilities to cells based on possible locations
-            for (int numIndex = 0; numIndex < numsLen; numIndex++) {
-                int num = nums[numIndex];
-                if (left[numIndex] + num - 1 < right[numIndex] - num + 1) {
-                    //min and max are disjoint
-                    //min is ambiguous
-                    for (int i = left[numIndex]; i < left[numIndex] + num; i++) {
-                        if (line[i] == 2) {
-                            possibilities[i].mayBeFilled();
-                            possibilities[i].mayBeEmpty();
-                        }
-                    }
-                    //in between, mark cbfilled where there's room and cbempty where it's not filled
-                    for (int index = left[numIndex] + num; index <= right[numIndex] - num; index++) {
-                        if (line[index] == 2) {
-                            if (theresRoom(index, num, 1)) {
-                                for (int i = index; i < index + num; i++) {
-                                    possibilities[i].mayBeFilled();
-                                }
-                            } else if (theresRoom(index, num, -1)) {
-                                possibilities[index].mayBeFilled();
-                            }
-                            possibilities[index].mayBeEmpty();
-                        }
-                    }
-                    //max is ambiguous
-                    for (int i = right[numIndex] - num + 1; i <= right[numIndex]; i++) {
-                        if (line[i] == 2) {
-                            possibilities[i].mayBeFilled();
-                            possibilities[i].mayBeEmpty();
-                        }
-                    }
+            //isolate and collect the sections of the line that are not crossed out
+            int left = 0;
+            int index = 0;
+            ArrayList<PicrossSolverLineSection> sectionsList = new ArrayList<>();
+            while (index < len) {
+                if (line[index] == crossedCell) {
+                    index++;
                 } else {
-                    //min and max overlap
-                    //write it all as ambiguous
-                    for (int i = left[numIndex]; i <= right[numIndex]; i++) {
-                        if (line[i] == 2) {
-                            possibilities[i].mayBeFilled();
-                            possibilities[i].mayBeEmpty();
-                        }
+                    left = index;
+                    while (index < len && line[index] != crossedCell) {
+                        index++;
                     }
-                    //rewrite the overlapping portion
-                    for (int i = right[numIndex] - num + 1; i <= left[numIndex] + num - 1; i++) {
-                        if (line[i] == 2) {
-                            possibilities[i].cantBeEmpty();
-                        }
-                    }
+                    debug("Found section: " + Arrays.toString(Arrays.copyOfRange(line, left, index)));
+                    sectionsList.add(new PicrossSolverLineSection(Arrays.copyOfRange(line, left, index)));
                 }
             }
-            for (int numIndex = 1; numIndex < numsLen; numIndex++) {
-                //if possible spots for consecutive nums have them non-overlapping
-                for (int i = right[numIndex - 1] + 1; i < left[numIndex]; i++) {
-                    possibilities[i].cantBeFilled();
-                    possibilities[i].mayBeEmpty();
+            sections = sectionsList.toArray(new PicrossSolverLineSection[sectionsList.size()]);
+
+            //distribute the numbers among the sections
+            //when there is a distribution that works, collect information on possible exact locations
+            countSections = sections.length;
+            distribution = new int[countNums];
+            
+            debug("Found " + countSections + " sections total");
+		}
+
+        public int[] getNewLine() throws Exception {
+            if (empty) {
+                int[] newLine = new int[line.length];
+                Arrays.fill(newLine, crossedCell);
+                debug("Returning line " + Arrays.toString(newLine));
+                return newLine;
+            }
+
+            tryEveryDistribution(0, 0, 0);
+            
+            int[] newLine = line.clone();
+            int index = 0;
+            int sectionIndex = 0;
+
+            while (index < len) {
+                if (newLine[index] == crossedCell) {
+                    index++;
+                } else {
+                    int[] newSection = sections[sectionIndex].getNewSectionInfo();
+                    for (int i = 0; i < newSection.length; i++) {
+                        newLine[index] = newSection[i];
+                        index++;
+                    }
+                    sectionIndex++;
+                }
+            }
+            
+            debug("Returning line " + Arrays.toString(newLine));
+            return newLine;
+        }
+
+        //fill an int array with the section index of each number, making sure that each is at least as far down
+        //as the last, but allowing for sections to be skipped
+        private void tryEveryDistribution(int numIndex, int sectionIndex, int spacesTaken) throws Exception {
+            if (sections[sectionIndex].len - spacesTaken >= nums[numIndex]) {
+                distribution[numIndex] = sectionIndex;
+                if (numIndex == countNums - 1) {
+                    tryDistribution();
+                } else {
+                    tryEveryDistribution(numIndex + 1, sectionIndex, spacesTaken + nums[numIndex] + 1);
                 }
             }
 
-            //return new information
-            int[] newline = new int[len];
-            for (int i = 0; i < len; i++) {
-                Boolean cbFilled = possibilities[i].getFilled();
-                Boolean cbEmpty = possibilities[i].getEmpty();
-                if (Boolean.TRUE.equals(cbFilled) && Boolean.TRUE.equals(cbEmpty)) {
-                    //we don't know which yet
-                    newline[i] = 2;
-                } else if (Boolean.TRUE.equals(cbFilled)) {
-                    //confirm fill whether Empty is deconfirmed or uninitialized
-                    newline[i] = 1;
-                } else if (Boolean.TRUE.equals(cbEmpty)) {
-                    //confirm empty whether Filled is deconfirmed or uninitialized
-                    newline[i] = 0;
-                } else if (Boolean.FALSE.equals(cbFilled) && Boolean.FALSE.equals(cbEmpty)) {
-                    //if both are deconfirmed then there is a contradiction in the logic
-                    throw new RuntimeException();
-                } else if (Boolean.FALSE.equals(cbFilled)) {
-                    //deconfirmed Filled, while Empty uninitialized, can say empty
-                    newline[i] = 0;
-                } else if (Boolean.FALSE.equals(cbEmpty)) {
-                    //deconfirmed Empty, while Filled uninitialized, can say empty
-                    newline[i] = 1;
+            for (int i = sectionIndex + 1; i < countSections; i++) {
+                if (sections[i].len >= nums[numIndex]) {
+                    distribution[numIndex] = i;
+                    if (numIndex == countNums - 1) {
+                        tryDistribution();
+                    } else {
+                        tryEveryDistribution(numIndex + 1, i, nums[numIndex] + 1);
+                    }
                 }
             }
-            return newline;
-		}
-		
-		//is there room for the block in the requested spot?
-		private boolean theresRoom(int index, int num, int dir) throws Exception {
-            //is the prior space not filled?
-            int prior = index - dir;
-            if (prior != -1 && prior != len) {
-                if (line[prior] == 1) {
+        }
+
+        //try the distribution and if there are no problems, see what new information it can give
+        private void tryDistribution() throws Exception {
+            debug("Trying distribution " + Arrays.toString(distribution));
+            int previousSectionIndex = -1;
+            int leftNumsIndex = 0;
+            int rightNumsIndex = 1;
+            while (rightNumsIndex <= nums.length) {
+                int sectionIndex = distribution[leftNumsIndex]; 
+
+                //break in between assigned sections
+                for (int i = previousSectionIndex + 1; i < sectionIndex; i++) {
+                    if (!sections[i].possibleToFit(new int[] {0})) {
+                        return;
+                    }
+                }
+
+                //stretch of nums assigned to same section
+                while (rightNumsIndex < nums.length && distribution[rightNumsIndex] == sectionIndex) {
+                    rightNumsIndex++;
+                }
+                if (!sections[sectionIndex].possibleToFit(Arrays.copyOfRange(nums, leftNumsIndex, rightNumsIndex))) {
+                    return;
+                }
+
+                previousSectionIndex = sectionIndex;
+                leftNumsIndex = rightNumsIndex;
+                rightNumsIndex++;
+            }
+            for (int i = previousSectionIndex + 1; i < sections.length; i++) {
+                if (!sections[i].possibleToFit(new int[] {0})) {
+                    return;
+                }
+            }
+            
+            debug("Distribution passed");
+            for (PicrossSolverLineSection section : sections) {
+                section.collectPossiblePlacementInfo();
+                section.collectionDebugMessage();
+            }
+        }
+
+        //represents a stretch of boxes that are not crossed out in between two boxes that are
+        //rely on the nature of wrapper class Boolean to be default Null, collect information on whether boxes may or may not be filled
+        private class PicrossSolverLineSection {
+            public int[] section;
+            public int len;
+            public int[] nums;
+            public int[] positions;
+            private int numsLen;
+            private enum Possibility { YES, NO, UNKNOWN }
+            private Possibility[] couldBeCrossed;
+            private Possibility[] couldBeFilled;
+            private boolean hasSomeFilled;
+
+            public PicrossSolverLineSection(int[] section) {
+                this.section = section;
+                len = section.length;
+                couldBeCrossed = new Possibility[len];
+                Arrays.fill(couldBeCrossed, Possibility.UNKNOWN);
+                couldBeFilled = couldBeCrossed.clone();
+
+                for (int i = 0; i < len; i++) {
+                    if (section[i] == filledCell) {
+                        couldBeCrossed[i] = Possibility.NO;
+                        couldBeFilled[i] = Possibility.YES;
+                        hasSomeFilled = true;
+                    }
+                }
+            }
+
+            //see if the given numbers will fit at all
+            public boolean possibleToFit(int[] nums) {
+                debug("Try to fit " + Arrays.toString(nums) + " in " + Arrays.toString(section));
+                try {
+                    this.nums = nums;
+                    numsLen = nums.length;
+                    positions = new int[numsLen];
+                    if (numsLen == 0 || nums[0] == 0) {
+                        debug("Are there already filled in spaces? " + hasSomeFilled);
+                        return !hasSomeFilled;
+                    }
+
+                    if (nums[0] == len) { 
+                        if (numsLen == 1) {
+                            debug("Fits exactly");
+                            return true;
+                        } else {
+                            debug("Obviously too large");
+                            return false;
+                        }
+                    }
+
+                    //establish starting positions not considering filled in spaces
+                    int index = 0;
+                    int numIndex = 0;
+                    while (numIndex < numsLen - 1) {
+                        positions[numIndex] = index;
+                        index += nums[numIndex] + 1;
+                        numIndex++;
+                    }
+                    positions[numIndex] = index;
+
+                    return couldFindNextAcceptablePositions(numsLen - 1);
+                } catch (ArrayIndexOutOfBoundsException e) {
+                    debug("Went over the end of the line, couldn't fit them");
                     return false;
                 }
             }
-            //are all the requred spaces not crossed?
-            for (int i = index; i != index + num * dir; i += dir) {
-                if (line[i] == 0) {
+
+            //if there are any uncovered spaces, move each over just enough.
+            //start loop over if anything is moved in case we uncovered a space again
+            private boolean couldFindNextAcceptablePositions(int numIndex) throws ArrayIndexOutOfBoundsException {
+                int index = len - 1;
+                if (numIndex < numsLen - 1) {
+                    index = positions[numIndex + 1] - 1;
+                }
+
+                int[] newPositions = positions.clone();
+                boolean loopAgain = true;
+                if (numIndex == -1) {
+                    loopAgain = false;
+                }
+                while (loopAgain) {
+                    loopAgain = false;
+                    int n = numIndex;
+                    int i = index;
+
+                    while (!loopAgain && n >= 0) {
+                        while (!loopAgain && i >= newPositions[n] + nums[n]) {
+                            if (section[i] == filledCell) {
+                                debug("Jump num at num index " + n + " to index " + (i - nums[n] + 1));
+                                newPositions[n] = i - nums[n] + 1;
+                                loopAgain = true;
+                            }
+                            i--;
+                        }
+                        moveIfPositionIsUnacceptable(n, newPositions);
+                        i = newPositions[n] - 1;
+                        n--;
+                    }
+
+                    while (!loopAgain && i >= 0) {
+                        if (section[i] == filledCell) {
+                            return false;
+                        }
+                        i--;
+                    }
+                }
+                for (int i = 0; i < newPositions[0]; i++) {
+                    if (section[i] == filledCell) {
+                        return false;
+                    }
+                }
+                debug("Found positions " + Arrays.toString(positions));
+                positions = newPositions;
+                return true;
+            }
+
+            private void moveIfPositionIsUnacceptable(int numIndex, int[] newPositions) throws ArrayIndexOutOfBoundsException {
+                debug("Check if we need to move num at num index " + numIndex + ": " + Arrays.toString(newPositions));
+                //if space on either side is filled, need to keep moving
+                //don't move if it would make us touch the neighbor
+                if (newPositions[numIndex] + nums[numIndex] < len && 
+                    ((newPositions[numIndex] - 1 != -1 ? section[newPositions[numIndex] - 1] == filledCell : false) || 
+                    section[newPositions[numIndex] + nums[numIndex]] == filledCell)) {
+                    int nextNumIndex = numIndex;
+                    while (nextNumIndex < numsLen - 1 && newPositions[nextNumIndex] + nums[nextNumIndex] + 1 == newPositions[nextNumIndex + 1]) {
+                        nextNumIndex++;
+                    }
+                    while (nextNumIndex > numIndex) {
+                        newPositions[nextNumIndex]++;
+                        if (newPositions[nextNumIndex] + nums[nextNumIndex] > len) {
+                            throw new ArrayIndexOutOfBoundsException();
+                        }
+                        debug("Move over num at num index " + nextNumIndex + " to make room for " + numIndex);
+                        moveIfPositionIsUnacceptable(nextNumIndex, newPositions);
+                        nextNumIndex--;
+                    }
+                    debug("Move over num at num index " + numIndex);
+                    newPositions[numIndex]++;
+                    moveIfPositionIsUnacceptable(numIndex, newPositions);
+                }
+            }
+
+            //positions have been verified to be ok, so fill out couldBe arrays 
+            public void collectPossiblePlacementInfo() throws Exception {
+                debug("Collect info for " + Arrays.toString(section));
+                if (nums[0] == 0) {
+                    for (int i = 0; i < couldBeCrossed.length; i++) {
+                        setCouldBeCrossed(i);
+                    }
+                    return;
+                }
+                if (nums[0] == len) {
+                    for (int i = 0; i < couldBeFilled.length; i++) {
+                        couldBeFilled[i] = Possibility.YES;
+                    }
+                    return;
+                }
+
+                //info from positions as-is, plus moving them all over without moving them off filled cells
+                int index = 0;
+                int numIndex = 0;
+                boolean[] covering = new boolean[numsLen];
+                while (numIndex < numsLen) {
+                    while (index < positions[numIndex]) {
+                        setCouldBeCrossed(index);
+                        index++;
+                    }
+                    while (index < positions[numIndex] + nums[numIndex]) {
+                        if (section[index] == filledCell) {
+                            covering[numIndex] = true;
+                        }
+                        couldBeFilled[index] = Possibility.YES;
+                        index++;
+                    }
+                    numIndex++;
+                }
+                while (index < len) {
+                    setCouldBeCrossed(index);
+                    index++;
+                }
+                for (int i = numsLen - 1; i > 0; i--) {
+                    maybeMovePlacementOver(i);
+                }
+                
+                //move to the right in a sweeping motion so that we catch possibilities where things are squished towards center
+                //and then possibilities where things are pushed far to the right
+                numIndex = 0;
+                int[] oldPositions = positions;
+                while (numIndex < numsLen) {
+                    debug("See if nums up to num index " + numIndex + " can be shifted");
+                    oldPositions = positions.clone();
+                    if (couldMoveWithoutCollision(numIndex)) {
+                        try {
+                            if (couldFindNextAcceptablePositions(numIndex)) {
+                                for (int n = numIndex; n > 0; n--) {
+                                    if (positions[n] != oldPositions[n]) {
+                                        for (int i = positions[n - 1] + nums[n - 1]; i < positions[n]; i++) {
+                                            setCouldBeCrossed(i);
+                                        }
+                                        for (int i = positions[n]; i < positions[n] + nums[n]; i++) {
+                                            couldBeFilled[i] = Possibility.YES;
+                                        }
+                                        maybeMovePlacementOver(n);
+                                    }
+                                }
+                                if (positions[0] != oldPositions[0]) {
+                                    for (int i = oldPositions[0]; i < positions[0]; i++) {
+                                        setCouldBeCrossed(i);
+                                    }
+                                    for (int i = positions[0]; i < positions[0] + nums[0]; i++) {
+                                        couldBeFilled[i] = Possibility.YES;
+                                    }
+                                    maybeMovePlacementOver(0);
+                                }
+                                numIndex = -1;
+                            } else {
+                                positions = oldPositions;
+                            }
+                        } catch (ArrayIndexOutOfBoundsException e) {
+                            return;
+                        }
+                    } else {
+                        positions = oldPositions;
+                    }
+                    numIndex++;
+
+
+                    /*if (couldMoveWithoutCollision(firstMovable)) {
+                        try {
+                            if (!couldFindNextAcceptablePositions(lastIndex, lastMovable)) {
+                                return;
+                            }
+                            for (int n = lastMovable; n > 0; n--) {
+                                for (int i = positions[n - 1] + nums[n - 1]; i < positions[n]; i++) {
+                                    setCouldBeCrossed(i);
+                                }
+                                for (int i = positions[n]; i < positions[n] + nums[n]; i++) {
+                                    couldBeFilled[i] = Possibility.YES;
+                                }
+                            }
+                            for (int i = positions[0]; i < positions[0] + nums[0]; i++) {
+                                couldBeFilled[i] = Possibility.YES;
+                            }
+                        } catch (ArrayIndexOutOfBoundsException e) {
+                            return;
+                        }
+                        maybeMovePlacementOver(lastMovable);
+                        lastIndex = positions[lastMovable] - 1;
+                    } else {
+                        lastIndex = positions[lastMovable] - 1;
+                        firstMovable++;
+                    }*/
+                }
+                
+                
+                
+                /*for (int i = 0; i < positions[0]; i++) {
+                    setCouldBeCrossed(i);
+                }
+                maybeMovePlacementOver(lastMovable);*/
+            }
+
+            public void collectionDebugMessage() {
+                debug("Collected info for section " + Arrays.toString(section) + ": couldBeCrossed: " + Arrays.toString(couldBeCrossed) +
+                     " and couldBeFilled: " + Arrays.toString(couldBeFilled));
+            }
+
+            private void maybeMovePlacementOver(int numIndex) throws Exception {
+                while (canMovePlacementOverByOne(numIndex)) {
+                    debug("Move num index " + numIndex + " to " + (positions[numIndex] + 1));
+                    setCouldBeCrossed(positions[numIndex]);
+                    couldBeFilled[positions[numIndex] + nums[numIndex]] = Possibility.YES;
+                    positions[numIndex]++;
+                }
+            }
+
+            private boolean canMovePlacementOverByOne(int numIndex) {
+                //debug("Check if can move " + numIndex + "th number");
+                if (section[positions[numIndex]] == emptyCell) {
+                    try {
+                        return section[positions[numIndex] + nums[numIndex] + 1] == emptyCell &&
+                            positions[numIndex] + nums[numIndex] + 1 != positions[numIndex + 1];
+                    } catch (ArrayIndexOutOfBoundsException e) {
+                        return positions[numIndex] + nums[numIndex] < len;
+                    }
+                } 
+                return false;
+            }
+
+            private boolean couldMoveWithoutCollision(int numIndex) {
+                debug("Try to force num index " + numIndex);
+                int newPosition = positions[numIndex];
+                do {
+                    newPosition++;
+                } while (newPosition + nums[numIndex] >= len ? false : 
+                (section[newPosition - 1] == filledCell || section[newPosition + nums[numIndex]] == filledCell));
+                
+                if (section[newPosition - 1] == emptyCell && 
+                    newPosition + nums[numIndex] < (numIndex == numsLen - 1 ? len + 1 : positions[numIndex + 1])) {
+                    positions[numIndex] = newPosition;
+                    return true;
+                } else {
                     return false;
                 }
             }
-            //is the space next after not filled?
-            int nextafter = index + (num * dir);
-            if (nextafter != -1 && nextafter != len) {
-                if (line[nextafter] == 1) {
-                    return false;
+
+            private void setCouldBeCrossed(int index) throws Exception {
+                if (index == -1 || index == len) {
+                    return;
+                }
+                if (couldBeCrossed[index] == Possibility.NO) {
+                    debug("Tried to overwrite uncrossed cell " + index + " of " + Arrays.toString(section));
+                    throw new Exception();
+                } else {
+                    couldBeCrossed[index] = Possibility.YES;
                 }
             }
-            return true;
-		}
-		
-		//tracks info on each square in the line
-		class PicrossSolverSquare {
-			private Boolean couldBeFilled;
-			private Boolean couldBeEmpty;
-			
-			//we can go from true to false but not false to true
-			public void alreadyFilled() {
-				couldBeFilled = true;
-				couldBeEmpty = false;
-			}
-			
-			public void alreadyEmpty() {
-				couldBeFilled = false;
-				couldBeEmpty = true;
-			}
-			
-			public void mayBeFilled() throws Exception {
-				if (Boolean.FALSE.equals(couldBeFilled)) {
-					throw new Exception();
-				} else {
-					couldBeFilled = true;
-				}
-			}
-			
-			public void mayBeEmpty() throws Exception {
-				if (Boolean.FALSE.equals(couldBeEmpty)) {
-					throw new Exception();
-				} else {
-					couldBeEmpty = true;
-				}
-			}
-			
-			public void cantBeFilled() {
-				couldBeFilled = false;
-			}
-			
-			public void cantBeEmpty() {
-				couldBeEmpty = false;
-			}
-			
-			public Boolean getFilled() {
-				return couldBeFilled;
-			}
-			
-			public Boolean getEmpty() {
-				return couldBeEmpty;
-			}
-		}
+
+            public int[] getNewSectionInfo() {
+                int[] newSection = section.clone();
+                for (int i = 0; i < section.length; i++) {
+                    if (couldBeFilled[i] == Possibility.YES && couldBeCrossed[i] != Possibility.YES) {
+                        newSection[i] = filledCell;
+                    } else if (couldBeFilled[i] != Possibility.YES && couldBeCrossed[i] == Possibility.YES) {
+                        newSection[i] = crossedCell;
+                    }
+                }
+                return newSection;
+            }
+        }
 	}
+
+    private void debug(String message) {
+        if (enableDebug) {
+            System.out.println(message);
+        }
+    }
+
+    public static void runTestSuite() {
+        if (enableDebug) {
+            new PicrossSolver(null, null, null);
+        } 
+    }
+
+    private void runTests() {
+        if (!enableDebug) {
+            return;
+        }
+
+        int index = 1;
+        boolean noFailure = true;
+        for (String testResult : new String[] {
+            test(index++, new int[] {2,2,2,2,2, 2,2,2,2,2, 2,2,2,2,2}, new int[] {0},               new int[] {0,0,0,0,0, 0,0,0,0,0, 0,0,0,0,0}),
+            test(index++, new int[] {2,2,2,2,2, 2,2,2,2,2, 2,2,2,2,2}, new int[] {15},              new int[] {1,1,1,1,1, 1,1,1,1,1, 1,1,1,1,1}),
+            test(index++, new int[] {2,2,2,2,2, 2,2,2,2,2, 2,2,2,2,2}, new int[] {1,1,1,1,1,1,1,1}, new int[] {1,0,1,0,1, 0,1,0,1,0, 1,0,1,0,1}),
+            test(index++, new int[] {2,2,2,2,2, 2,2,2,2,2, 2,2,2,2,2}, new int[] {7},               new int[] {2,2,2,2,2, 2,2,2,2,2, 2,2,2,2,2}),
+            test(index++, new int[] {2,2,2,2,2, 2,2,2,2,2, 2,2,2,2,2}, new int[] {8},               new int[] {2,2,2,2,2, 2,2,1,2,2, 2,2,2,2,2}),
+
+            test(index++, new int[] {2,2,2,2,2, 2,2,2,2,2, 2,2,2,2,2}, new int[] {10},              new int[] {2,2,2,2,2, 1,1,1,1,1, 2,2,2,2,2}),
+            test(index++, new int[] {2,1,2,2,2, 2,2,2,2,2, 2,2,2,2,2}, new int[] {10},              new int[] {2,1,1,1,1, 1,1,1,1,1, 2,0,0,0,0}),
+            test(index++, new int[] {2,2,1,2,2, 2,2,2,2,2, 2,2,2,2,2}, new int[] {5},               new int[] {2,2,1,1,1, 2,2,0,0,0, 0,0,0,0,0}),
+            test(index++, new int[] {2,2,1,2,2, 2,2,2,2,2, 2,2,2,2,2}, new int[] {5,1},             new int[] {2,2,1,1,1, 2,2,2,2,2, 2,2,2,2,2}),
+            test(index++, new int[] {2,2,2,2,2, 2,2,2,2,2, 2,2,2,2,2}, new int[] {5,5},             new int[] {2,2,2,2,1, 2,2,2,2,2, 1,2,2,2,2}), //10
+
+            test(index++, new int[] {2,2,2,2,2, 2,2,2,2,2, 2,2,2,2,2}, new int[] {4,4,4},           new int[] {2,1,1,1,2, 2,1,1,1,2, 2,1,1,1,2}),
+            test(index++, new int[] {2,2,2,2,2, 2,2,2,2,2, 2,2,2,2,2}, new int[] {3,6,4},           new int[] {1,1,1,0,1, 1,1,1,1,1, 0,1,1,1,1}),
+            test(index++, new int[] {2,2,1,2,2, 2,1,2,2,2, 2,1,2,2,2}, new int[] {3,6,4},           new int[] {1,1,1,0,1, 1,1,1,1,1, 0,1,1,1,1}),
+            test(index++, new int[] {2,2,2,2,0, 2,2,2,2,2, 2,2,2,2,2}, new int[] {8},               new int[] {0,0,0,0,0, 2,2,1,1,1, 1,1,1,2,2}),
+            test(index++, new int[] {2,2,2,2,0, 2,2,2,2,2, 2,2,2,2,2}, new int[] {5},               new int[] {0,0,0,0,0, 2,2,2,2,2, 2,2,2,2,2}),
+
+            test(index++, new int[] {2,2,0,2,2, 0,2,2,0,2, 2,0,2,2,2}, new int[] {2,2,1,2},         new int[] {2,2,0,2,2, 0,2,2,0,2, 2,0,2,2,2}),
+            test(index++, new int[] {2,2,0,2,2, 0,2,2,0,2, 2,0,2,2,2}, new int[] {2,2,1,3},         new int[] {2,2,0,2,2, 0,2,2,0,2, 2,0,1,1,1}),
+            test(index++, new int[] {2,2,0,2,2, 0,2,2,0,2, 2,0,2,2,2}, new int[] {2,2,1,2,2},       new int[] {1,1,0,1,1, 0,2,2,0,1, 1,0,2,1,2}),
+            test(index++, new int[] {2,2,2,2,2, 0,2,2,2,2, 2,2,2,2,2}, new int[] {3,5},             new int[] {2,2,2,2,2, 0,2,2,2,2, 1,2,2,2,2}),
+            test(index++, new int[] {2,2,2,2,2, 2,2,0,2,2, 2,2,2,2,2}, new int[] {7},               new int[] {2,2,2,2,2, 2,2,0,2,2, 2,2,2,2,2}), //20
+
+            test(index++, new int[] {2,2,2,2,2, 2,2,0,2,2, 2,1,2,2,2}, new int[] {7},               new int[] {0,0,0,0,0, 0,0,0,1,1, 1,1,1,1,1}),
+            test(index++, new int[] {2,2,2,2,2, 2,2,2,2,2, 2,2,2,2,2}, new int[] {1,1,1,1,1,1,1},   new int[] {2,2,2,2,2, 2,2,2,2,2, 2,2,2,2,2}),
+            test(index++, new int[] {2,2,2,2,2, 2,2,2,2,2, 2,2,2,1,2}, new int[] {1,1,1,1,1,1,1},   new int[] {2,2,2,2,2, 2,2,2,2,2, 2,2,0,1,0}),
+            test(index++, new int[] {0,2,2,2,2, 2,2,2,2,2, 2,2,2,2,0}, new int[] {1,1,1,1,1,1,1},   new int[] {0,1,0,1,0, 1,0,1,0,1, 0,1,0,1,0}),
+            test(index++, new int[] {2,2,2,2,2, 0,1,2,2,2, 2,2,2,2,2}, new int[] {3,4},             new int[] {2,2,2,2,2, 0,1,1,1,2, 2,2,2,2,2}),
+            
+            test(index++, new int[] {1,2,2,2,2, 2,2,2,2,2, 2,2,2,2,2}, new int[] {4,1},             new int[] {1,1,1,1,0, 2,2,2,2,2, 2,2,2,2,2}),
+            test(index++, new int[] {2,2,2,2,2, 2,2,2,2,2, 2,2,2,2,1}, new int[] {1,4},             new int[] {2,2,2,2,2, 2,2,2,2,2, 0,1,1,1,1}),
+            test(index++, new int[] {2,2,2,2,2, 2,2,2,0,1, 0,2,2,2,2}, new int[] {1,3},             new int[] {0,0,0,0,0, 0,0,0,0,1, 0,2,1,1,2}),
+            test(index++, new int[] {2,2,2,2,2, 2,2,2,2,1, 1,1,2,2,2}, new int[] {5,2},             new int[] {0,0,0,0,0, 0,0,1,1,1, 1,1,0,1,1}),
+            test(index++, new int[] {2,2,2,2,2, 2,2,1,1,2, 2,2,2,2,2}, new int[] {1,5,1},           new int[] {2,2,2,2,2, 2,2,1,1,2, 2,2,2,2,2}), //30
+            
+            test(index++, new int[] {2,2,2,2,2, 1,2,2,2,2, 2,2,2,2,2}, new int[] {5,3},             new int[] {0,2,2,2,2, 1,2,2,2,2, 2,2,2,2,2}),
+            test(index++, new int[] {2,2,2,2,0, 1,2,2,2,2, 2,2,2,2,2}, new int[] {3,3},             new int[] {2,2,2,2,0, 1,1,1,0,2, 2,2,2,2,2}),
+            test(index++, new int[] {2,2,2,2,2, 2,2,2,2,2, 0,1,2,2,2}, new int[] {3,3},             new int[] {2,2,2,2,2, 2,2,2,2,2, 0,1,1,1,0}),
+            test(index++, new int[] {0,1,1,1,0, 2,2,1,2,2, 2,2,1,2,2}, new int[] {3,3,3},           new int[] {0,1,1,1,0, 2,2,1,2,2, 2,2,1,2,2}),
+            test(index++, new int[] {0,1,1,1,0, 2,2,2,2,2, 2,2,2,2,2}, new int[] {3,3,3},           new int[] {0,1,1,1,0, 2,2,2,2,2, 2,2,2,2,2}),
+            
+            test(index++, new int[] {2,2,2,2,2, 1,2,2,2,2, 2,2,2,2,2}, new int[] {5},               new int[] {0,2,2,2,2, 1,2,2,2,2, 0,0,0,0,0}),
+            test(index++, new int[] {2,2,2,2,2, 2,2,2,2,2, 2,2,2,2,2}, new int[] {1},               new int[] {2,2,2,2,2, 2,2,2,2,2, 2,2,2,2,2}),
+            test(index++, new int[] {2,2,0,2,2, 0,0,2,2,2, 0,2,0,2,2}, new int[] {3,1},             new int[] {0,0,0,0,0, 0,0,1,1,1, 0,2,0,2,2}),
+            test(index++, new int[] {2,2,1,1,1, 2,2,2,2,2, 1,1,2,2,2}, new int[] {1,3,4},           new int[] {1,0,1,1,1, 0,0,0,2,2, 1,1,2,2,0}),
+            test(index++, new int[] {2,2,2,2,2, 2,2,2,2,2, 2,2,2,2,2}, new int[] {14},              new int[] {2,1,1,1,1, 1,1,1,1,1, 1,1,1,1,2}), //40
+
+            test(index++, new int[] {0,2,2,2,2, 2,2,2,1,2, 2,2,2,2,0}, new int[] {1,4,1},           new int[] {0,2,2,2,2, 2,2,2,1,2, 2,2,2,2,0}),
+            test(index++, new int[] {0,2,2,2,2, 2,2,1,0,2, 2,2,2,2,0}, new int[] {1,2,1,1,1},       new int[] {0,2,2,2,2, 2,2,1,0,2, 2,2,2,2,0}),
+            test(index++, new int[] {0,2,2,2,2, 1,2,2,2,1, 0,2,2,2,0}, new int[] {1,2,3,1},         new int[] {0,2,2,0,1, 1,0,1,1,1, 0,2,2,2,0}),
+            test(index++, new int[] {2,2,2,1,1, 1,2,2,2,2, 1,1,2,2,2}, new int[] {1,3,4},           new int[] {2,2,0,1,1, 1,0,0,2,2, 1,1,2,2,0}),
+            test(index++, new int[] {2,2,2,2,0, 0,2,2,1,2, 2,2,2,2,2, 1,2,2,2,2}, new int[] {4,1,2,5},    new int[] {1,1,1,1,0, 0,2,0,1,2, 2,2,2,2,2, 1,2,2,2,2}),
+
+            test(index++, new int[] {1,1,1,1,0, 2,2,2,2,2, 2,1,2,2,2, 2,2,2,2,2, 2,2,2,2,2}, new int[] {4,5,3}, 
+                          new int[] {1,1,1,1,0, 2,2,2,2,2, 2,1,2,2,2, 2,2,2,2,2, 2,2,2,2,2}),
+            test(index++, new int[] {2,2,2,2,1, 1,2,2,2,2, 2,1,1,2,2, 2,2,2,1,1, 1,2,2,2,2}, new int[] {4,1,3,5,3}, 
+                          new int[] {0,0,2,2,1, 1,2,2,2,2, 2,1,1,2,0, 0,1,1,1,1, 1,0,1,1,1}),
+            test(index++, new int[] {2,2,1,2,0, 2,2,2,2,2, 0,2,2,0,2, 2,2,2,0,2, 2,2,2,2,2}, new int[] {2,1,3}, 
+                          new int[] {0,2,1,2,0, 2,2,2,2,2, 0,2,2,0,2, 2,2,2,0,2, 2,2,2,2,2}),
+            test(index++, new int[] {1,1,0,0,0, 0,2,1,1,1, 2,2,1,2,2, 2,2,2,2,2, 2,2,2,2,2}, new int[] {2,4,1,1,2,2,1}, 
+                          new int[] {1,1,0,0,0, 0,2,1,1,1, 2,0,1,0,2, 2,2,2,2,2, 2,2,2,2,2}),
+            test(index++, new int[] {0,0,0,1,2, 2,2,2,2,2, 2,2,2,2,1, 1,0,2,2,2, 2,0,2,2,2}, new int[] {2,2,1,2}, 
+                          new int[] {0,0,0,1,1, 0,2,2,2,2, 2,2,2,0,1, 1,0,2,2,2, 2,0,2,2,2}), //50
+            
+            test(index++, new int[] {0,0,1,1,0, 1,0,0,2,2, 2,2,2,2,1, 2,2,2,0,0}, new int[] {2,1,1,1,1,2},      
+                          new int[] {0,0,1,1,0, 1,0,0,2,2, 2,2,2,0,1, 2,2,2,0,0}),
+            test(index++, new int[] {2,2,2,2,2, 2,2,2,2,1, 2,2,1,2,2, 2,2,2,2,2, 2,2,2,2,2, 2,2,2,2,2, 2,2,2,2,2}, new int[] {5,1,4,4},      
+                          new int[] {2,2,2,2,2, 2,2,2,2,1, 2,2,1,2,2, 2,2,2,2,2, 2,2,2,2,2, 2,2,2,2,2, 2,2,2,2,2}),
+            test(index++, new int[] {0,0,0,0,0, 0,0,0,0,0, 0,0,2,2,2, 2,2,2,2,2, 0,0,2,2,2, 0,2,2,2,0, 2,1,2,2,2, 2,0,0,1,0}, new int[] {1,2,1,1,2,1},      
+                          new int[] {0,0,0,0,0, 0,0,0,0,0, 0,0,2,2,2, 2,2,2,2,2, 0,0,2,2,2, 0,2,2,2,0, 2,1,2,2,2, 2,0,0,1,0}),
+            test(index++, new int[] {2,2,2,2,2, 2,2,2,1,2, 2,2,2,2,2, 2,2,1,2,2, 0,1,0,2,1}, new int[] {2,2,1,1,2}, 
+                          new int[] {2,2,2,2,2, 2,2,2,1,2, 2,2,2,2,2, 2,2,1,0,2, 0,1,0,1,1})
+        }) {
+            if (testResult.length() > 0) {
+                System.out.println(testResult);
+                noFailure = false;
+            }
+        }
+        if (noFailure) {
+            System.out.println("\nAll test cases pass!");
+        }
+    }
+
+    private String test(int testIndex, int[] inputline, int[] inputnums, int[] output) {
+        debug("Test " + testIndex);
+        return test(testIndex, inputline, inputnums, output, false);
+    }
+
+    private String test(int testIndex, int[] inputline, int[] inputnums, int[] output, boolean expectFail) {
+        int[] result = new int[0];
+        try {
+            result = (new PicrossSolverLine(inputline, inputnums)).getNewLine();
+            int i = 0;
+            while (i < result.length) {
+                if (result[i] != output[i]) {
+                    return "Test " + testIndex + " failure: Expected: " + Arrays.toString(output) + " Result: " + Arrays.toString(result);
+                }
+                i++;
+            }
+            if (i < output.length) {
+                if (expectFail) {
+                    return "";
+                }
+                return "Test " + testIndex + " failure: Expected: " + Arrays.toString(output) + " Result: " + Arrays.toString(result);
+            }
+            return "";
+        } catch (Exception e) {
+            if (expectFail) {
+                return "";
+            }
+            return "Test " + testIndex + " failure: Expected: " + Arrays.toString(output) + " Result: " + Arrays.toString(result) + " Exception: " + e;
+        }
+    }
 }

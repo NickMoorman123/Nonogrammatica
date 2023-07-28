@@ -1,5 +1,3 @@
-package application;
-
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStream;
@@ -31,14 +29,13 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.text.TextAlignment;
-import javafx.scene.web.WebEngine;
-import javafx.scene.web.WebView;
 import javafx.event.ActionEvent;
 import javafx.geometry.Pos;
 import javafx.geometry.Insets;
 
 
 public class Main extends Application {
+	boolean runTestCases = true;
 	
 	@Override
 	public void start(Stage stage) {
@@ -51,19 +48,8 @@ public class Main extends Application {
 			
 			BorderPane root = new BorderPane();
 			
-			Button btnAbout = new Button("About Nonograms");
-			btnAbout.setOnAction(e -> {
-				about(stage);
-			});
-			
-			HBox header = new HBox(btnAbout);
-			header.setAlignment(Pos.CENTER_LEFT);
-			header.setPadding(new Insets(10,10,10,10));
-			
-			root.setTop(header);
-			
 			//Set up play-mode buttons and "logo" in center of home screen
-			InputStream stream = new FileInputStream("src/N.png");
+			InputStream stream = new FileInputStream("N.png");
 			Image image = new Image(stream);
 			ImageView logo = new ImageView(image);
 			Button btnCreate = new Button("Draw a Nonogram");
@@ -93,65 +79,12 @@ public class Main extends Application {
 			stage.show();
 			
 			//Deselect all buttons
-			root.requestFocus();
+			btnCreate.requestFocus();
 			
-		} catch(Exception e) {
-			e.printStackTrace();
-		}
-	}
-	
-	//description of what nonograms are
-	public void about(Stage stage) {
-		try {
-			BorderPane root = new BorderPane();
-			stage.setHeight(600);
-			stage.setMinHeight(600);
-			stage.setWidth(600);
-			stage.setMinWidth(600);
-			
-			//button to get to home screen
-			Button btnBack = new Button("Back");
-			btnBack.setOnAction(e -> {
-				start(stage);
-			});
-			btnBack.setAlignment(Pos.CENTER_LEFT);
-			HBox header = new HBox(btnBack);
-			header.setPadding(new Insets(10,10,10,10));
-			
-			//Add content: a blurb and a webpage description
-			Label desc = new Label("	The Nonogram/Hanjie/Paint by Numbers" +
-				"/Picross/Griddlers/Pic-a-Pix logic puzzle originates from Japan." +
-				" The objective is to color in squares in a grid to reveal a bitmap " +
-				"image.\n	You are given the length/height of each sequence of " +
-				"filled squares occurring within each respective row/column of the " +
-				"grid, and must deduce which cells necessarily are filled or " +
-				"empty. As you fill in and cross out squares in one row or " +
-				"column, more information is obtained about the perpendicular " +
-				"column or row.\n	\"Guess-and-check\" or \"if-then\" logic should not " +
-				"be necessary to solve a well-designed nonogram. The solver " + 
-				"in Nonogrammatica will determine if the puzzle you draw or provide" + 
-				"is solvable, so long as this is not necessary to solve.\n\n" +
-				"	Some descriptions of techniques to solve are embedded below:\n ");
-			desc.setPadding(new Insets(5,5,5,5));
-			desc.setWrapText(true);
-			desc.setTextAlignment(TextAlignment.LEFT);
-			desc.setPrefWidth(600);
-			
-			VBox fullheader = new VBox(header, desc);
-			root.setTop(fullheader);
-			
-			WebView browser = new WebView();
-			WebEngine webEngine = browser.getEngine();
-			webEngine.load("https://www.nonograms.org/methods");
-			root.setCenter(browser);
-			
-			//Display
-			Scene settings = new Scene(root);
-			stage.setScene(settings);
-			
-			//Deselect all buttons
-			root.requestFocus();
-			
+			if (runTestCases) {
+				PicrossSolver.runTestSuite();
+				runTestCases = false;
+			}
 		} catch(Exception e) {
 			e.printStackTrace();
 		}
@@ -356,7 +289,7 @@ public class Main extends Application {
 			
 			Button btnCheck = new Button("Check Solvability");
 			btnCheck.setOnAction(e -> {
-				displaySolvability(picross.getLabels());
+				displaySolvability(picross.getLabels(), picross.getMatrix(false), numCols, numRows);
 				picross.requestFocus();
 			});
 			
@@ -387,8 +320,8 @@ public class Main extends Application {
 			
 			stage.setScene(creator);
 			stage.sizeToScene();
-			stage.setHeight(Math.min(Math.max(stage.getHeight(), 400), 600));
-			stage.setWidth(Math.min(Math.max(stage.getWidth(), 400), 600));
+			stage.setHeight(Math.max((int) Math.ceil(1.4 * numRows) * PicrossGrid.cellSize + 150, 450));
+			stage.setWidth(Math.max((int) Math.ceil(1.3 * numCols) * PicrossGrid.cellSize, 400));
 			
 			picross.timer.start();
 			
@@ -402,21 +335,21 @@ public class Main extends Application {
 	}
 	
 	//new window with results of solver
-	public void displaySolvability(int[][][] labels) {
+	public void displaySolvability(int[][][] labels, int[][] solution, int numCols, int numRows) {
         try {
             Stage secondaryStage = new Stage();
-            secondaryStage.setHeight(650);
-            secondaryStage.setMinHeight(650);
-            secondaryStage.setWidth(650);
-            secondaryStage.setMinWidth(650);
+			int height = Math.max((int) Math.ceil(1.4 * numRows) * PicrossGrid.cellSize + 150, 450);
+            secondaryStage.setHeight(height);
+            secondaryStage.setMinHeight(height);
+			int width = Math.max((int) Math.ceil(1.3 * numCols) * PicrossGrid.cellSize, 400);
+            secondaryStage.setWidth(width);
+            secondaryStage.setMinWidth(width);
 
-            PicrossSolver solver = new PicrossSolver(labels);
-            File answer = File.createTempFile("temp", ".csv");
-            solver.getResult(answer);
-
-            Scanner scanner = new Scanner(answer);
-            scanner.useDelimiter(",|\\n");
-
+            PicrossGrid picturePicross = new PicrossGrid(numCols, numRows, false);
+			picturePicross.overrideLabels(labels);
+            picturePicross.getStylesheets().add(getClass().getResource("picross.css").toExternalForm());
+			picturePicross.setAllUnknown();
+			PicrossSolver solver = new PicrossSolver(labels, solution, picturePicross);
 
             BorderPane check = new BorderPane();
             Label result = new Label();
@@ -427,57 +360,65 @@ public class Main extends Application {
             Pane Hspacer = new Pane();
             HBox.setHgrow(Hspacer, Priority.ALWAYS);
 
-            PicrossGrid picturePicross = new PicrossGrid(Integer.parseInt(scanner.next()), Integer.parseInt(scanner.next()), false);
-            picturePicross.getStylesheets().add(getClass().getResource("picross.css").toExternalForm());
-            picturePicross.resumeWork(answer);
-
             ScrollPane scrollPicturePicross = new ScrollPane(new Group(picturePicross));
             check.setCenter(scrollPicturePicross);
 
-            HBox buttons;
-
-            if (solver.solvable()) {
-                result.setText("Solvable! Do you want to export the puzzle to .png?");
-
-                FileChooser fileChooser = new FileChooser();
-                fileChooser.setTitle("Select a Save Location");
-                fileChooser.getExtensionFilters().add(new ExtensionFilter("PNG Files", "*.png"));
-
-                Button btnEUnsolved = new Button("Export Unsolved");
-                btnEUnsolved.setOnAction(ex -> {
-                    File unsolvedPuzzle = fileChooser.showSaveDialog(secondaryStage);
-                    picturePicross.exportUnsolved(unsolvedPuzzle);
-                });
-
-                Pane spacer = new Pane();
-                HBox.setHgrow(spacer, Priority.ALWAYS);
-
-                Button btnESolved = new Button("Export Solved");
-                btnESolved.setOnAction(ex -> {
-                    File solvedPuzzle = fileChooser.showSaveDialog(secondaryStage);
-                    picturePicross.export(solvedPuzzle);
-                });
-
-                buttons = new HBox(btnEUnsolved, spacer, btnESolved);
-            } else {
-                result.setText("Not Solvable!");
-                picturePicross.overrideLabels(labels);
-
-                Button btnOK = new Button("OK");
-                btnOK.setOnAction(ex -> {
-                    secondaryStage.close();
-                });
-                btnOK.setPadding(new Insets(10,10,10,10));
-                check.setBottom(btnOK);
-
-                buttons = new HBox(btnOK);
-            }
-            buttons.setPadding(new Insets(10,10,10,10));
-            check.setBottom(buttons);
-
-            Scene secondaryScene = new Scene(check);
+			Scene secondaryScene = new Scene(check);
             secondaryStage.setScene(secondaryScene);
             secondaryStage.show();
+
+			//solver.solve();
+			new Thread() {
+				public void run() {
+					//The delay is only to allow for the second window to show before the solver starts going
+					try {
+						sleep(450);
+					} catch (Exception e) {}
+					boolean solvable = solver.solvable();
+
+					//Platform.runLater is necesary for thread-safe updates to UI
+					Platform.runLater(() -> {
+						HBox buttons;
+						if (solvable) {
+							result.setText("Solvable! Do you want to export the puzzle to .png?");
+
+							FileChooser fileChooser = new FileChooser();
+							fileChooser.setTitle("Select a Save Location");
+							fileChooser.getExtensionFilters().add(new ExtensionFilter("PNG Files", "*.png"));
+
+							Button btnEUnsolved = new Button("Export Unsolved");
+							btnEUnsolved.setOnAction(ex -> {
+								File unsolvedPuzzle = fileChooser.showSaveDialog(secondaryStage);
+								picturePicross.exportUnsolved(unsolvedPuzzle);
+							});
+
+							Pane spacer = new Pane();
+							HBox.setHgrow(spacer, Priority.ALWAYS);
+
+							Button btnESolved = new Button("Export Solved");
+							btnESolved.setOnAction(ex -> {
+								File solvedPuzzle = fileChooser.showSaveDialog(secondaryStage);
+								picturePicross.export(solvedPuzzle);
+							});
+
+							buttons = new HBox(btnEUnsolved, spacer, btnESolved);
+						} else {
+							result.setText("Not Solvable!");
+
+							Button btnOK = new Button("OK");
+							btnOK.setOnAction(ex -> {
+								secondaryStage.close();
+							});
+							btnOK.setPadding(new Insets(10,10,10,10));
+							check.setBottom(btnOK);
+
+							buttons = new HBox(btnOK);
+						}
+						buttons.setPadding(new Insets(10,10,10,10));
+						check.setBottom(buttons);
+					});
+				}
+			}.start();
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -663,7 +604,7 @@ public class Main extends Application {
 			boolean acceptAll = validateInputs(pointersToColErrors, pointersToColFields, newColLabels, numRows, false);
 			if (acceptAll) {
 				int [][][] labels = {newColLabels, rowLabels};
-				displaySolvability(labels);
+				displaySolvability(labels, null, numCols, numRows);
 			}
 		});
 		HBox HBSubmit = new HBox(btnSubmit);

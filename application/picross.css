@@ -11,17 +11,20 @@
 	-fx-border-width: 0 1 1 0 ;
 }
 
-.cell.cursor {
-	-fx-border-color: yellow ;
-	-fx-border-width: 2 2 2 2 ;
-}
-
 .clear {
-	-fx-background-color: white, white ;
+	-fx-background-color: white ;
 }
 
 .filled {
 	-fx-background-color: white, black ;
+}
+
+.filled.cursor {
+	-fx-background-color: rgb(0, 247, 255), black ;
+}
+
+.cursor {
+	-fx-background-color: rgb(0, 247, 255) ;
 }
 
 .unknown {
@@ -32,10 +35,22 @@
 	-fx-border-width: 1 1 1 0 ;
 }
 
+.after-fifth-row.cell {
+	-fx-background-insets: 0, 3 3 3 2 ;
+}
+
 .after-fifth-column {
 	-fx-border-width: 0 1 1 1 ;
 }
 
+.after-fifth-column.cell {
+	-fx-background-insets: 0, 2 3 3 3 ;
+}
+
 .after-fifth-row.after-fifth-column {
 	-fx-border-width: 1 1 1 1 ;
+}
+
+.after-fifth-row.after-fifth-column.cell {
+	-fx-background-insets: 0, 3 3 3 3 ;
 }

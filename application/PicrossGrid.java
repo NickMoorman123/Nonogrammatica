@@ -1,5 +1,3 @@
-package application;
-
 import java.awt.Desktop;
 import java.awt.image.RenderedImage;
 import java.io.BufferedWriter;
@@ -15,6 +13,7 @@ import java.util.stream.Collectors;
 import javax.imageio.ImageIO;
 
 import javafx.animation.AnimationTimer;
+import javafx.application.Platform;
 import javafx.embed.swing.SwingFXUtils;
 import javafx.geometry.HPos;
 import javafx.geometry.Pos;
@@ -42,7 +41,7 @@ public class PicrossGrid extends GridPane {
 	private final int numCols;
 	private final int numRows;
 	private int mult;
-	private final int cellSize = 18;
+	public static final int cellSize = 18;
 	public PicrossGrid(int numCols, int numRows, boolean editing) {
 		this.numCols = numCols;
 		this.numRows = numRows;
@@ -70,8 +69,8 @@ public class PicrossGrid extends GridPane {
 		getRowConstraints().add(columnLabels);
 		
 		//add column heights and numbers
-		ColumnConstraints columnGrid = new ColumnConstraints(cellSize);
 		for (int i = 1; i < numCols + 1; i++) {
+			ColumnConstraints columnGrid = new ColumnConstraints(i % 5 == 1 ? cellSize + 1 : cellSize);
 			getColumnConstraints().add(columnGrid);
 			PicrossText nums = new PicrossText("\n");
 			nums.setTextAlignment(TextAlignment.CENTER);
@@ -88,8 +87,8 @@ public class PicrossGrid extends GridPane {
 		}
 		
 		//add row lengths and number labels
-		RowConstraints rowGrid = new RowConstraints(cellSize);
 		for (int i = 1; i < numRows + 1; i++) {
+			RowConstraints rowGrid = new RowConstraints(i % 5 == 1 ? cellSize + 1 : cellSize);
 			getRowConstraints().add(rowGrid);
 			PicrossText nums = new PicrossText(" ");
 			pointersToTexts[numCols + i - 1] = nums;
@@ -414,6 +413,24 @@ public class PicrossGrid extends GridPane {
 		int[][][] headers = {cols, rows};
 		return headers;
 	}
+
+	//get int matrix of puzzle
+	public int[][] getMatrix(boolean clearOut) {
+		int[][] matrix = new int[numCols][numRows];
+		for (int c = 1; c <= numCols; c++) { 
+			for (int r = 1; r <= numRows; r++) { 
+				if (pointersToPanes[c][r].filled()) {
+					if (clearOut) {
+						pointersToPanes[c][r].clear();
+					}
+					matrix[c - 1][r - 1] = 1;
+				} else {
+					matrix[c - 1][r - 1] = 0;
+				}
+			}
+		}
+		return matrix;
+	}
 	
 	//get solved image of puzzle 
 	public void export(File puzzle) {
@@ -430,27 +447,43 @@ public class PicrossGrid extends GridPane {
 	
 	//get unsolved image of puzzle
 	public void exportUnsolved(File puzzle) {
-		int[][] grid = new int[numCols][numRows];
-		for (int c = 1; c <= numCols; c++) { 
-			for (int r = 1; r <= numRows; r++) { 
-				if (pointersToPanes[c][r].filled()) {
-					pointersToPanes[c][r].clear();
-					grid[c - 1][r - 1] = 1;
-				} else {
-					grid[c - 1][r - 1] = 0;
-				}
-			}
-		}
+		int[][] matrix = getMatrix(true);
 		
 		export(puzzle);
 		
 		for (int c = 1; c <= numCols; c++) { 
 			for (int r = 1; r <= numRows; r++) { 
-				if (grid[c - 1][r - 1] == 1) {
+				if (matrix[c - 1][r - 1] == 1) {
 					pointersToPanes[c][r].setFilled();
 				} 
 			}
 		}
+	}
+
+	//for setting up the solver before finding information
+	public void setAllUnknown() {
+		for (int c = 1; c <= numCols; c++) { 
+			for (int r = 1; r <= numRows; r++) { 
+				pointersToPanes[c][r].getStyleClass().add("unknown");
+			}
+		}
+	}
+
+	//for watching the solver discover information
+	//Platform.runLater() allows for thead-safe updates to the UI
+	public void fillCell(int col, int row) {
+		Platform.runLater( () -> {
+			PicrossPane pane = pointersToPanes[col + 1][row + 1];
+			pane.getStyleClass().remove("unknown");
+			pane.setFilled();
+		});
+	}
+	public void clearCell(int col, int row) {
+		Platform.runLater( () -> {
+			PicrossPane pane = pointersToPanes[col + 1][row + 1];
+			pane.getStyleClass().remove("unknown");
+			pane.clear();
+		});
 	}
 	
 	//display the header numbers for each row and column
@@ -497,34 +530,34 @@ public class PicrossGrid extends GridPane {
 			getStyleClass().add("cell");
 		}
 		
-		public int getCol() {
+		private int getCol() {
 			return col;
 		}
 		
-		public int getRow() {
+		private int getRow() {
 			return row;
 		}
 		
 		//need to remove before adding so that css tags are not added multiple times
-		public void setFilled() {
+		private void setFilled() {
 			getStyleClass().remove("clear");
 			getStyleClass().remove("filled");
 			getStyleClass().add("filled");
 			filled = true;
 		}
 		
-		public void clear() {
+		private void clear() {
 			getStyleClass().remove("filled");
 			getStyleClass().remove("clear");
 			getStyleClass().add("clear");
 			filled = false;
 		}
 		
-		public boolean filled() {
+		private boolean filled() {
 			return filled;
 		}
 		
-		public void setUnknown() {
+		private void setUnknown() {
 			getStyleClass().add("unknown");
 		}
 	}
