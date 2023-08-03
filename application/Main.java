@@ -367,12 +367,11 @@ public class Main extends Application {
             secondaryStage.setScene(secondaryScene);
             secondaryStage.show();
 
-			//solver.solve();
 			new Thread() {
 				public void run() {
 					//The delay is only to allow for the second window to show before the solver starts going
 					try {
-						sleep(450);
+						sleep(600);
 					} catch (Exception e) {}
 					boolean solvable = solver.solvable();
 

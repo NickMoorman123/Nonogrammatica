@@ -1,11 +1,5 @@
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.Writer;
 import java.util.ArrayList;
 import java.util.Arrays;
-
-import javafx.concurrent.Task;
 
 public class PicrossSolver {
     private final static boolean enableDebug = true;
@@ -47,19 +41,6 @@ public class PicrossSolver {
 		}
         debug("Create solver on " + numCols + " columns and " + numRows + " rows");
 	}
-
-    //Perform calculations on a separate thread to not lag the UI thread
-    public void solve() {
-		new Thread() {
-            public void run() {
-                //The delay is only to allow for the second window to show before the solver starts going
-                try {
-                    sleep(450);
-                } catch (Exception e) {}
-                iterate();
-            }
-        }.start();
-    }
 	
 	//get whether it is solvable
 	public boolean solvable() {
@@ -119,6 +100,7 @@ public class PicrossSolver {
 	//look for changes to make to a column
 	private boolean colUpdate(int col, boolean doPerpendiculars) throws Exception {
         debug("Try to update column " + col);
+        picrossGrid.focusNums(col);
         boolean changed = false;
 
         //get current state
@@ -143,6 +125,10 @@ public class PicrossSolver {
                     intGrid[col][r] = newline[r];
                     changed = true;
                     rowsToUpdate[r] = true;
+
+                    if (!enableDebug) {
+                        Thread.sleep(20);
+                    }
                     if (newline[r] == filledCell) {
                         picrossGrid.fillCell(col, r);
                     } else {
@@ -156,6 +142,7 @@ public class PicrossSolver {
             }
         }
 
+        picrossGrid.unfocusNums(col);
         if (doPerpendiculars) {
             debug("Will update rows due to changes on column " + col + ": " + Arrays.toString(rowsToUpdate));
             for (int r = 0; r < numRows; r++) {
@@ -171,6 +158,7 @@ public class PicrossSolver {
 	//look for changes to make to a row
 	private boolean rowUpdate(int row, boolean doPerpendiculars) throws Exception {
         debug("Try to update row " + row);
+        picrossGrid.focusNums(numCols + row);
         boolean changed = false;
 
         //get current state
@@ -198,6 +186,10 @@ public class PicrossSolver {
                     intGrid[c][row] = newline[c];
                     changed = true;
                     colsToUpdate[c] = true;
+                    
+                    if (!enableDebug) {
+                        Thread.sleep(20);
+                    }
                     if (newline[c] == filledCell) {
                         picrossGrid.fillCell(c, row);
                     } else {
@@ -211,6 +203,7 @@ public class PicrossSolver {
             } 
         }
 
+        picrossGrid.unfocusNums(numCols + row);
         if (doPerpendiculars) {
             debug("Will update cols due to changes on row " + row + ": " + Arrays.toString(colsToUpdate));
             for (int c = 0; c < numCols; c++) {

@@ -4,6 +4,10 @@
 	-fx-border-width: 0 1 1 0 ;
 }
 
+.nums.focused {
+	-fx-background-color: yellow ;
+}
+
 .cell {
 	-fx-background-insets: 0, 2 3 3 2 ;
 	-fx-background-color: white, white ;

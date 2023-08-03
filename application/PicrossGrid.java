@@ -31,8 +31,8 @@ import javafx.scene.text.Text;
 import javafx.scene.text.TextAlignment;
 
 public class PicrossGrid extends GridPane {
-	private final PicrossPane[][] pointersToPanes;
-	private final PicrossText[] pointersToTexts;
+	private final PicrossPane[][] referencesToPanes;
+	private final PicrossText[] referencesToTexts;
 	private PicrossPane current;
 	private KeyCode state = KeyCode.SPACE;
 	private KeyCode direction = KeyCode.SPACE;
@@ -46,14 +46,14 @@ public class PicrossGrid extends GridPane {
 		this.numCols = numCols;
 		this.numRows = numRows;
 		//some pointers will be null, for consistency in indexes
-		pointersToPanes = new PicrossPane[numCols + 1][numRows + 1];
-		pointersToTexts = new PicrossText[numCols + numRows];
+		referencesToPanes = new PicrossPane[numCols + 1][numRows + 1];
+		referencesToTexts = new PicrossText[numCols + numRows];
 		
 		//make sure top left empty space has correct borders
 		PicrossPane topLeft = new PicrossPane(0, 0);
 		topLeft.getStyleClass().add("nums");
 		add(topLeft, 0, 0);
-		pointersToPanes[0][0] = topLeft;
+		referencesToPanes[0][0] = topLeft;
 		setVgrow(topLeft, Priority.ALWAYS);
 		setHgrow(topLeft, Priority.ALWAYS);
 		
@@ -74,7 +74,7 @@ public class PicrossGrid extends GridPane {
 			getColumnConstraints().add(columnGrid);
 			PicrossText nums = new PicrossText("\n");
 			nums.setTextAlignment(TextAlignment.CENTER);
-			pointersToTexts[i - 1] = nums;
+			referencesToTexts[i - 1] = nums;
 			VBox labelCell = new VBox(nums);
 			setVgrow(labelCell, Priority.ALWAYS);
 			labelCell.setAlignment(Pos.BOTTOM_CENTER);
@@ -91,7 +91,7 @@ public class PicrossGrid extends GridPane {
 			RowConstraints rowGrid = new RowConstraints(i % 5 == 1 ? cellSize + 1 : cellSize);
 			getRowConstraints().add(rowGrid);
 			PicrossText nums = new PicrossText(" ");
-			pointersToTexts[numCols + i - 1] = nums;
+			referencesToTexts[numCols + i - 1] = nums;
 			HBox labelCell = new HBox(nums);
 			setHgrow(labelCell, Priority.ALWAYS);
 			labelCell.setAlignment(Pos.CENTER_RIGHT);
@@ -121,7 +121,7 @@ public class PicrossGrid extends GridPane {
 				}
 				
 				add(cell, c, r);
-				pointersToPanes[c][r] = cell;
+				referencesToPanes[c][r] = cell;
 			}
 		}
 		
@@ -137,7 +137,7 @@ public class PicrossGrid extends GridPane {
 		
 		resizeLabels();
 		if (editing) {
-			current = pointersToPanes[1][1];
+			current = referencesToPanes[1][1];
 			current.getStyleClass().add("cursor");
 		}
 	}
@@ -184,7 +184,7 @@ public class PicrossGrid extends GridPane {
 		LinkedList<Integer> colNums = new LinkedList<>();
 		int tempBlock = 0;
 		for (int r = 1; r <= numRows; r++) {
-			if (pointersToPanes[currentCol][r].filled()) {
+			if (referencesToPanes[currentCol][r].filled()) {
 				tempBlock++;
 			} else {
 				if (tempBlock > 0) {
@@ -200,9 +200,9 @@ public class PicrossGrid extends GridPane {
 		int[] newColNums = colNums.stream().mapToInt(Integer::intValue).toArray();
 		if (newColNums.length == 0) {
 			int[] startZero = {0};
-			pointersToTexts[currentCol - 1].updateText(startZero);
+			referencesToTexts[currentCol - 1].updateText(startZero);
 		} else {
-			pointersToTexts[currentCol - 1].updateText(newColNums);
+			referencesToTexts[currentCol - 1].updateText(newColNums);
 		}
 	}
 	
@@ -211,7 +211,7 @@ public class PicrossGrid extends GridPane {
 		LinkedList<Integer> rowNums = new LinkedList<>();
 		int tempBlock = 0;
 		for (int c = 1; c <= numCols; c++) {
-			if (pointersToPanes[c][currentRow].filled()) {
+			if (referencesToPanes[c][currentRow].filled()) {
 				tempBlock++;
 			} else {
 				if (tempBlock > 0) {
@@ -227,9 +227,9 @@ public class PicrossGrid extends GridPane {
 		int[] newRowNums = rowNums.stream().mapToInt(Integer::intValue).toArray();
 		if (newRowNums.length == 0) {
 			int[] startZero = {0};
-			pointersToTexts[numCols + currentRow - 1].updateText(startZero);
+			referencesToTexts[numCols + currentRow - 1].updateText(startZero);
 		} else {
-			pointersToTexts[numCols + currentRow - 1].updateText(newRowNums);
+			referencesToTexts[numCols + currentRow - 1].updateText(newRowNums);
 		}
 	}
 	
@@ -239,10 +239,10 @@ public class PicrossGrid extends GridPane {
 		int[][] rowLabels = labels[1];
 		
 		for (int c = 0; c < numCols; c++) {
-			pointersToTexts[c].updateText(colLabels[c]);
+			referencesToTexts[c].updateText(colLabels[c]);
 		}
 		for (int r = 0; r < numRows; r++) {
-			pointersToTexts[numCols + r].updateText(rowLabels[r]);
+			referencesToTexts[numCols + r].updateText(rowLabels[r]);
 		}
 		
 		resizeLabels();
@@ -252,30 +252,30 @@ public class PicrossGrid extends GridPane {
 	private void resizeLabels() {
 		int newHeight = 0;
 		for (int c = 0; c < numCols; c++) {
-			int height = (int) pointersToTexts[c].getLayoutBounds().getHeight();
+			int height = (int) referencesToTexts[c].getLayoutBounds().getHeight();
 			if (height > newHeight) {
 				newHeight = height;
 			}
 		}
-		pointersToPanes[0][0].setMinHeight(newHeight + 2);
-		pointersToPanes[0][0].setMaxHeight(newHeight + 2);
+		referencesToPanes[0][0].setMinHeight(newHeight + 2);
+		referencesToPanes[0][0].setMaxHeight(newHeight + 2);
 		for (int c = 0; c < numCols; c++) {
-			((VBox) pointersToTexts[c].getParent()).setMinHeight(newHeight + 2);
-			((VBox) pointersToTexts[c].getParent()).setMaxHeight(newHeight + 2);
+			((VBox) referencesToTexts[c].getParent()).setMinHeight(newHeight + 2);
+			((VBox) referencesToTexts[c].getParent()).setMaxHeight(newHeight + 2);
 		}
 		
 		int newWidth = 0;
 		for (int r = 0; r < numRows; r++) {
-			int width = (int) pointersToTexts[numCols + r].getLayoutBounds().getWidth();
+			int width = (int) referencesToTexts[numCols + r].getLayoutBounds().getWidth();
 			if (width > newWidth) {
 				newWidth = width;
 			}
 		}
-		pointersToPanes[0][0].setMinWidth(newWidth + 4);
-		pointersToPanes[0][0].setMaxWidth(newWidth + 4);
+		referencesToPanes[0][0].setMinWidth(newWidth + 4);
+		referencesToPanes[0][0].setMaxWidth(newWidth + 4);
 		for (int r = 0; r < numRows; r++) {
-			((HBox) pointersToTexts[numCols + r].getParent()).setMinWidth(newWidth + 4);
-			((HBox) pointersToTexts[numCols + r].getParent()).setMaxWidth(newWidth + 4);
+			((HBox) referencesToTexts[numCols + r].getParent()).setMinWidth(newWidth + 4);
+			((HBox) referencesToTexts[numCols + r].getParent()).setMaxWidth(newWidth + 4);
 		}
 	}
 	
@@ -295,7 +295,7 @@ public class PicrossGrid extends GridPane {
 	//change current cell
 	private void moveCursor(int col, int row) {
 		current.getStyleClass().remove("cursor");
-		current = pointersToPanes[Math.max(1, Math.min(col, numCols))][Math.max(1, Math.min(row, numRows))];
+		current = referencesToPanes[Math.max(1, Math.min(col, numCols))][Math.max(1, Math.min(row, numRows))];
 		current.getStyleClass().add("cursor");
 	}
 	
@@ -334,7 +334,7 @@ public class PicrossGrid extends GridPane {
 			for (int r = 1; r <= numRows; r++) { 
 				String[] row = new String[numCols];
 				for (int c = 1; c <= numCols; c++) { 
-					if (pointersToPanes[c][r].filled()) {
+					if (referencesToPanes[c][r].filled()) {
 						row[c - 1] = "1";
 					} else {
 						row[c - 1] = "0";
@@ -366,9 +366,9 @@ public class PicrossGrid extends GridPane {
 				for (int c = 1; c <= numCols; c++) {
 					String next = scanner.next().trim();
 					if (next.equals("1")) {
-						pointersToPanes[c][r].setFilled();
+						referencesToPanes[c][r].setFilled();
 					} else if (next.equals("2")) {
-						pointersToPanes[c][r].setUnknown();
+						referencesToPanes[c][r].setUnknown();
 					} else if (!next.equals("0")) {
 						scanner.close();
 						return false;
@@ -402,12 +402,12 @@ public class PicrossGrid extends GridPane {
 	public int[][][] getLabels() {
 		int[][] cols = new int[numCols][];
 		for (int c = 0; c < numCols; c++) { 
-			cols[c] = pointersToTexts[c].getNums();
+			cols[c] = referencesToTexts[c].getNums();
 		}
 		
 		int[][] rows = new int[numRows][];
 		for (int r = 0; r < numRows; r++) { 
-			rows[r] = pointersToTexts[numCols + r].getNums();
+			rows[r] = referencesToTexts[numCols + r].getNums();
 		}
 		
 		int[][][] headers = {cols, rows};
@@ -419,9 +419,9 @@ public class PicrossGrid extends GridPane {
 		int[][] matrix = new int[numCols][numRows];
 		for (int c = 1; c <= numCols; c++) { 
 			for (int r = 1; r <= numRows; r++) { 
-				if (pointersToPanes[c][r].filled()) {
+				if (referencesToPanes[c][r].filled()) {
 					if (clearOut) {
-						pointersToPanes[c][r].clear();
+						referencesToPanes[c][r].clear();
 					}
 					matrix[c - 1][r - 1] = 1;
 				} else {
@@ -454,7 +454,7 @@ public class PicrossGrid extends GridPane {
 		for (int c = 1; c <= numCols; c++) { 
 			for (int r = 1; r <= numRows; r++) { 
 				if (matrix[c - 1][r - 1] == 1) {
-					pointersToPanes[c][r].setFilled();
+					referencesToPanes[c][r].setFilled();
 				} 
 			}
 		}
@@ -464,7 +464,7 @@ public class PicrossGrid extends GridPane {
 	public void setAllUnknown() {
 		for (int c = 1; c <= numCols; c++) { 
 			for (int r = 1; r <= numRows; r++) { 
-				pointersToPanes[c][r].getStyleClass().add("unknown");
+				referencesToPanes[c][r].getStyleClass().add("unknown");
 			}
 		}
 	}
@@ -473,16 +473,26 @@ public class PicrossGrid extends GridPane {
 	//Platform.runLater() allows for thead-safe updates to the UI
 	public void fillCell(int col, int row) {
 		Platform.runLater( () -> {
-			PicrossPane pane = pointersToPanes[col + 1][row + 1];
+			PicrossPane pane = referencesToPanes[col + 1][row + 1];
 			pane.getStyleClass().remove("unknown");
 			pane.setFilled();
 		});
 	}
 	public void clearCell(int col, int row) {
 		Platform.runLater( () -> {
-			PicrossPane pane = pointersToPanes[col + 1][row + 1];
+			PicrossPane pane = referencesToPanes[col + 1][row + 1];
 			pane.getStyleClass().remove("unknown");
 			pane.clear();
+		});
+	}
+	public void focusNums(int textIndex) {
+		Platform.runLater( () -> {
+			referencesToTexts[textIndex].getParent().getStyleClass().add("focused");
+		});
+	}
+	public void unfocusNums(int textIndex) {
+		Platform.runLater( () -> {
+			referencesToTexts[textIndex].getParent().getStyleClass().remove("focused");
 		});
 	}
 	
