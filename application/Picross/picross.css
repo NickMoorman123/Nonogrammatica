@@ -4,7 +4,7 @@
 	-fx-border-width: 0 1 1 0 ;
 }
 
-.nums.focused {
+.focused.nums {
 	-fx-background-color: yellow ;
 }
 
@@ -31,8 +31,16 @@
 	-fx-background-color: rgb(0, 247, 255) ;
 }
 
-.unknown {
-	-fx-background-color: white, red ;
+.cross-back-slash {
+	-fx-shape: "M 4,3 L 16,15 L 15,16 L 3,4 Z" ;
+	-fx-scale-shape: false ;
+	-fx-background-color: black ;
+}
+
+.cross-forward-slash {
+	-fx-shape: "M 15,3 L 3,15 L 4,16 L 16,4 Z" ;
+	-fx-scale-shape: false ;
+	-fx-background-color: black ;
 }
 
 .after-fifth-row {

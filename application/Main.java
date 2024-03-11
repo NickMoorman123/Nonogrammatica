@@ -2,16 +2,19 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStream;
 import java.util.Arrays;
+import java.util.Optional;
 import java.util.Scanner;
-import java.util.stream.Collectors;
 
+import Picross.PicrossEditor;
+import Picross.PicrossGrid;
+import Picross.PicrossViewer;
+import Solver.PicrossSolver;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.stage.FileChooser;
 import javafx.stage.FileChooser.ExtensionFilter;
 import javafx.stage.Stage;
 import javafx.scene.Group;
-import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
@@ -29,694 +32,601 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.text.TextAlignment;
-import javafx.event.ActionEvent;
 import javafx.geometry.Pos;
 import javafx.geometry.Insets;
 
 
 public class Main extends Application {
-	boolean runTestCases = true;
+	private static final Color RED = Color.web("#ff0000");
 	
 	@Override
 	public void start(Stage stage) {
 		try {
+			stage.getIcons().add(new Image(new FileInputStream("Icon.png")));
+
 			stage.setTitle("Nonogrammatica");
-			stage.setHeight(400);
-			stage.setMinHeight(400);
-			stage.setWidth(400);
-			stage.setMinWidth(400);
+			setStageSize(stage, 400.0, 400.0);
 			
 			BorderPane root = new BorderPane();
 			
-			//Set up play-mode buttons and "logo" in center of home screen
-			InputStream stream = new FileInputStream("N.png");
-			Image image = new Image(stream);
-			ImageView logo = new ImageView(image);
-			Button btnCreate = new Button("Draw a Nonogram");
-			Button btnSolve = new Button("Use Nonogram Solver");
-			btnCreate.setOnAction(e -> {
-				getDimensions(stage, true);
-			});
-			btnSolve.setOnAction(e -> {
-				getDimensions(stage, false);
-			});
+			ImageView logo = new ImageView(new Image(new FileInputStream("N.png")));
+
+			Button buttonCreate = new Button("Draw a Nonogram");
+			buttonCreate.setOnAction(e -> getDimensionsForEditor(stage, true));
+
+			Button buttonSolve = new Button("Use Nonogram Solver");
+			buttonSolve.setOnAction(e -> getDimensionsForEditor(stage, false));
 			
-			VBox playmodes = new VBox(logo, btnCreate, btnSolve);
-			playmodes.setSpacing(10);
-			playmodes.setAlignment(Pos.CENTER);
+			VBox vBoxPlaymodes = new VBox(logo, buttonCreate, buttonSolve);
+			vBoxPlaymodes.setSpacing(10);
+			vBoxPlaymodes.setAlignment(Pos.CENTER);
 			
-			root.setCenter(playmodes);
+			root.setCenter(vBoxPlaymodes);
 			
-			Label signature = new Label("Made by Nicholas Moorman\nnicholas.v.moorman@gmail.com");
-			signature.setTextAlignment(TextAlignment.CENTER);
-			HBox HBSig = new HBox(signature);
-			HBSig.setAlignment(Pos.CENTER);
-			root.setBottom(HBSig);
+			Label labelSignature = new Label("Made by Nicholas Moorman\nnicholas.v.moorman@gmail.com");
+			labelSignature.setTextAlignment(TextAlignment.CENTER);
+			HBox hBoxSignature = new HBox(labelSignature);
+			hBoxSignature.setAlignment(Pos.CENTER);
+			root.setBottom(hBoxSignature);
 			
-			//Display
-			Scene homescreen = new Scene(root);
-			stage.setScene(homescreen);
+			Scene sceneHomescreen = new Scene(root);
+			stage.setScene(sceneHomescreen);
 			stage.show();
 			
-			//Deselect all buttons
-			btnCreate.requestFocus();
+			buttonCreate.requestFocus();
 			
-			if (runTestCases) {
-				PicrossSolver.runTestSuite();
-				runTestCases = false;
-			}
+			PicrossSolver.maybeRunTests();
 		} catch(Exception e) {
 			e.printStackTrace();
 		}
 	}
 	
-	//take inputs to nonogram editor
-	public void getDimensions(Stage stage, boolean drawing) {
+	public void getDimensionsForEditor(Stage stage, boolean inDrawMode) {
 		try {
-			stage.setHeight(400);
-			stage.setMinHeight(400);
-			stage.setWidth(400);
-			stage.setMinWidth(400);
-			BorderPane root = new BorderPane();
+			setStageSize(stage, 400.0, 400.0);
+
+			BorderPane borderPaneRoot = new BorderPane();
 			
-			Button btnBack = new Button("Back");
-			btnBack.setOnAction(e -> {
-				start(stage);
-			});
-			btnBack.setAlignment(Pos.CENTER_LEFT);
+			Button buttonBack = new Button("Back");
+			buttonBack.setOnAction(e -> start(stage));
+			buttonBack.setAlignment(Pos.CENTER_LEFT);
 			
-			HBox buttons;
-			if (drawing) {
-				Pane spacer = new Pane();
-				HBox.setHgrow(spacer, Priority.ALWAYS);
+			HBox hBoxNavigationButtons;
+			if (inDrawMode) {
+				Pane paneSpacer = new Pane();
+				HBox.setHgrow(paneSpacer, Priority.ALWAYS);
 				
-				Button btnOpen = new Button("Open From File");
-				btnOpen.setOnAction(e -> {
-					FileChooser fileChooser = new FileChooser();
-					fileChooser.setTitle("Select File");
-					fileChooser.getExtensionFilters().add(new ExtensionFilter("CSV Files", "*.csv"));
-					File savedWork = fileChooser.showOpenDialog(stage);
-					creator(e, savedWork);
-				});
+				Button buttonOpen = new Button("Open From File");
+				buttonOpen.setOnAction(e -> openSavedWork(stage));
 				
-				buttons = new HBox(btnBack, spacer, btnOpen);
+				hBoxNavigationButtons = new HBox(buttonBack, paneSpacer, buttonOpen);
 			} else {
-				buttons = new HBox(btnBack);
+				hBoxNavigationButtons = new HBox(buttonBack);
 			}
-			buttons.setPadding(new Insets(10,10,10,10));
+			hBoxNavigationButtons.setPadding(new Insets(10,10,10,10));
 			
-			//tell user what to do
-			String direct = "Input width and height.";
-			if (drawing) {
-				direct = direct + "\nMultiples of 5 are recommended for readability.";
-			}
-			Label instr = new Label(direct);
-			instr.setTextAlignment(TextAlignment.CENTER);
-			instr.setPadding(new Insets(10,10,10,10));
+			String directions = "Input height and width." + (inDrawMode ? "\nMultiples of 5 are recommended for readability." : "\n");
+			Label labelInstructions = new Label(directions);
+			labelInstructions.setTextAlignment(TextAlignment.CENTER);
+			labelInstructions.setPadding(new Insets(10,10,10,10));
 			
-			VBox header = new VBox(buttons, instr);
-			header.setAlignment(Pos.CENTER);
-			root.setTop(header);
+			VBox vBoxHeader = new VBox(hBoxNavigationButtons, labelInstructions);
+			vBoxHeader.setAlignment(Pos.CENTER);
+			borderPaneRoot.setTop(vBoxHeader);
 			
-			//set up input fields
-			Pane wSpacer1 = new Pane();
-			wSpacer1.setPrefWidth(140);
-			Label lblWidth = new Label("Width: ");
-			TextField widthField = new TextField();
-			widthField.setPrefWidth(50);
-			Pane wSpacer2 = new Pane();
-			wSpacer2.setPrefWidth(130);
-			HBox widthBox = new HBox(lblWidth, widthField, wSpacer2);
-			widthBox.setAlignment(Pos.CENTER_RIGHT);
-			Label lblWidthError = new Label("");
-			lblWidthError.setTextAlignment(TextAlignment.LEFT);
-			lblWidthError.setPadding(new Insets(3,3,3,3));
-			lblWidthError.setTextFill(Color.web("#ff0000"));
+			Label labelHeight = new Label("Height: ");
+			labelHeight.setTextAlignment(TextAlignment.RIGHT);
+			labelHeight.setAlignment(Pos.CENTER_RIGHT);
+			labelHeight.setMinWidth(115);
+
+			TextField textFieldHeight = new TextField();
+			textFieldHeight.setMaxWidth(50);
+
+			Label labelHeightError = new Label("");
+			labelHeightError.setTextAlignment(TextAlignment.LEFT);
+			labelHeightError.setPadding(new Insets(3,0,8,0));
+			labelHeightError.setTextFill(RED);
+			labelHeightError.setMinWidth(165);
 			
-			Label lblHeight = new Label("Height: ");
-			TextField heightField = new TextField();
-			heightField.setPrefWidth(50);
-			Pane hSpacer = new Pane();
-			hSpacer.setPrefWidth(130);
-			HBox heightBox = new HBox(lblHeight, heightField, hSpacer);
-			heightBox.setAlignment(Pos.CENTER_RIGHT);
-			Label lblHeightError = new Label("");
-			lblHeightError.setAlignment(Pos.CENTER_LEFT);
-			lblHeightError.setPadding(new Insets(3,3,8,3));
-			lblHeightError.setTextFill(Color.web("#ff0000"));
+			Label labelWidth = new Label("Width: ");
+			labelWidth.setTextAlignment(TextAlignment.RIGHT);
+			labelWidth.setAlignment(Pos.CENTER_RIGHT);
+			labelWidth.setMinWidth(115);
 			
-			GridPane fields = new GridPane();
-			GridPane.setConstraints(wSpacer1, 0, 0);
-			GridPane.setConstraints(widthBox, 1, 0);
-			GridPane.setConstraints(lblWidthError, 1, 1);
-			GridPane.setConstraints(heightBox, 1, 2);
-			GridPane.setConstraints(lblHeightError, 1, 3);
-			fields.getChildren().addAll(wSpacer1, widthBox, lblWidthError, heightBox, lblHeightError);
-			fields.setAlignment(Pos.CENTER);
+			TextField textFieldWidth = new TextField();
+			textFieldWidth.setMaxWidth(50);
+
+			Label labelWidthError = new Label("");
+			labelWidthError.setTextAlignment(TextAlignment.LEFT);
+			labelWidthError.setPadding(new Insets(3,0,13,0));
+			labelWidthError.setTextFill(RED);
+			labelWidthError.setMinWidth(165);
 			
-			//submit button with function doing input data validation
-			//enter button simuates button press
-			Button btnSubmit = new Button("Submit");
-			root.addEventHandler(KeyEvent.KEY_PRESSED, ev -> {
+			Button buttonSubmit = new Button("Submit");
+			buttonSubmit.setOnAction(e -> goToEditorOrManualInput(stage, validateDimensionInput(textFieldHeight.getText().trim(), labelHeightError),
+																	validateDimensionInput(textFieldWidth.getText().trim(), labelWidthError), inDrawMode));
+			
+			borderPaneRoot.addEventHandler(KeyEvent.KEY_PRESSED, ev -> {
 		        if (ev.getCode() == KeyCode.ENTER) {
-		        	btnSubmit.fire();
+		        	buttonSubmit.fire();
 		        	ev.consume();  
 		        }
 		    });
-			btnSubmit.setOnAction(e -> {
-				String width = widthField.getText().trim();
-				String height = heightField.getText().trim();
-				boolean wAccept = true;
-				boolean hAccept = true;
-				int wInt = 0;
-				int hInt = 0;
-				try {
-					wInt = Integer.parseInt(width);
-					if (wInt <= 0) {
-						lblWidthError.setText("Please input a positive integer.");
-						wAccept = false;
-					} else if (wInt > 100) {
-						lblWidthError.setText("Maximum is 100, sorry!");
-						wAccept = false;
-					}
-				} catch(Exception ex) {
-					lblWidthError.setText("Please input a positive integer.");
-					wAccept = false;
-				}
-				try {
-					hInt = Integer.parseInt(height);
-					if (hInt <= 0) {
-						lblHeightError.setText("Please input a positive integer.");
-						hAccept = false;
-					} else if (hInt > 100) {
-						lblHeightError.setText("Maximum is 100, sorry!");
-						hAccept = false;
-					}
-				} catch(Exception ex) {
-					lblHeightError.setText("Please input a positive integer.");
-					hAccept = false;
-				}
-				if (wAccept) {lblWidthError.setText("");}
-				if (hAccept) {lblHeightError.setText("");}
-				if (wAccept && hAccept && drawing) {
-					creator(e, wInt, hInt);
-				} else if (wAccept && hAccept && !drawing) {
-					getRows(stage, wInt, hInt, null, null);
-				}
-			});
 			
-			Pane bSpacer = new Pane();
-			bSpacer.setPrefHeight(120);
+			GridPane gridPaneInputFields = new GridPane();
+			GridPane.setConstraints(labelHeight, 0, 0);
+			GridPane.setConstraints(textFieldHeight, 1, 0);
+			GridPane.setConstraints(labelHeightError, 1, 1);
+			GridPane.setConstraints(labelWidth, 0, 2);
+			GridPane.setConstraints(textFieldWidth, 1, 2);
+			GridPane.setConstraints(labelWidthError, 1, 3);
+			GridPane.setConstraints(buttonSubmit, 1, 4);
+			gridPaneInputFields.getChildren().addAll(labelHeight, textFieldHeight, labelHeightError, labelWidth, textFieldWidth, labelWidthError);
+			gridPaneInputFields.setAlignment(Pos.CENTER);
+
+			VBox vBoxInputFields = new VBox(gridPaneInputFields, buttonSubmit);
+			vBoxInputFields.setPadding(new Insets(0,0,100,0));
+			vBoxInputFields.setAlignment(Pos.CENTER);
+
+			borderPaneRoot.setCenter(vBoxInputFields);
 			
-			VBox inputs = new VBox(fields, btnSubmit, bSpacer);
-			inputs.setAlignment(Pos.CENTER);
-			root.setCenter(inputs);
+			Scene sceneSettings = new Scene(borderPaneRoot);
+			stage.setScene(sceneSettings);
 			
-			Scene settings = new Scene(root);
-			stage.setScene(settings);
-			
-			widthField.requestFocus();
+			textFieldHeight.requestFocus();
 			
 		} catch(Exception e) {
 			e.printStackTrace();
 		}
 	}
-	
-	//open and fill existing work
-	public void creator(ActionEvent event, File file) {
+
+	private int validateDimensionInput(String input, Label error) {
 		try {
-			Stage stage = (Stage)((Node)event.getSource()).getScene().getWindow();
-			Scanner scanner = new Scanner(file);
+			int dimension = Integer.parseInt(input);
+			if (dimension <= 0) {
+				throw new Exception();
+			} else if (dimension > 100) {
+				error.setText("Maximum is 100, sorry!");
+				return 0;
+			} else {
+				error.setText("");
+				return dimension;
+			}
+		} catch(Exception ex) {
+			error.setText("Please input a positive integer.");
+			return 0;
+		}
+	}
+
+	public void goToEditorOrManualInput(Stage stage, int rowCount, int colCount, boolean inDrawMode) {
+		if (rowCount > 0 && colCount > 0) {
+			if (inDrawMode) {
+				openEditor(stage, rowCount, colCount);
+			} else {
+				getManualInput(stage, rowCount, colCount);
+			}
+		}
+	}
+	
+	public void openSavedWork(Stage stage) {
+		FileChooser fileChooser = new FileChooser();
+		fileChooser.setTitle("Select File");
+		fileChooser.getExtensionFilters().add(new ExtensionFilter("CSV Files", "*.csv"));
+		File savedWork = fileChooser.showOpenDialog(stage);
+
+		try (Scanner scanner = new Scanner(savedWork)) {
 			scanner.useDelimiter(",|\\n");
 			
-			PicrossGrid picross = creator(event, Integer.parseInt(scanner.next()), Integer.parseInt(scanner.next()));
-			if (!picross.resumeWork(file)) {
-				failedLoad(stage, picross);
+			Optional<PicrossEditor> picrossEditor = openEditor(stage, Integer.parseInt(scanner.next()), Integer.parseInt(scanner.next()));
+			if (picrossEditor.isEmpty()) {
+				return;
+			}
+
+			if (!picrossEditor.get().resumeWork(savedWork)) {
+				displayFailedLoadWindow(stage, "Failed to load data!");
 			}
 			
-			scanner.close();
 		} catch(Exception e) {
 			e.printStackTrace();
 		}
 	}
+
+	public void displayFailedLoadWindow(Stage stage, String failureText) {
+		setStageSize(stage, 200.0, 200.0);
+		
+		Label labelWarning = new Label(failureText);
+		labelWarning.setTextAlignment(TextAlignment.CENTER);
+		labelWarning.setPadding(new Insets(10,10,10,10));
+		
+		Button buttonOK = new Button("OK");
+		buttonOK.setOnAction(e -> getDimensionsForEditor(stage, true));
+		
+		VBox vBoxFailure = new VBox(labelWarning, buttonOK);
+		vBoxFailure.setAlignment(Pos.CENTER);
+		vBoxFailure.setPadding(new Insets(10,10,10,10));
+		
+		Scene confirm = new Scene(vBoxFailure);
+		stage.setScene(confirm);
+	}
 	
-	//things to do whether opening new or resuming work
-	public PicrossGrid creator(ActionEvent event, int numCols, int numRows) {
+	public Optional<PicrossEditor> openEditor(Stage stage, int rowCount, int colCount) {
 		try {
-			Stage stage = (Stage)((Node)event.getSource()).getScene().getWindow();
-			BorderPane root = new BorderPane();
-			Scene creator = new Scene(root);
-			PicrossGrid picross = new PicrossGrid(numCols, numRows, true);
-			picross.getStylesheets().add(getClass().getResource("picross.css").toExternalForm());
-			ScrollPane scrollPicross = new ScrollPane(picross);
-			scrollPicross.hbarPolicyProperty().setValue(ScrollPane.ScrollBarPolicy.ALWAYS);
-			scrollPicross.vbarPolicyProperty().setValue(ScrollPane.ScrollBarPolicy.ALWAYS);
-			scrollPicross.setFitToHeight(true);
-			scrollPicross.setFitToWidth(true);
-			scrollPicross.setOnMouseClicked(e -> {
-				picross.requestFocus();
-			});
-			root.setCenter(scrollPicross);
+			setStageSize(stage, Math.max(Math.ceil(1.4 * rowCount) * PicrossGrid.cellSize + 150, 450.0), Math.max(Math.ceil(1.3 * colCount) * PicrossGrid.cellSize, 400.0));
+			BorderPane borderPaneRoot = new BorderPane();
+
+			Scene sceneEditor = new Scene(borderPaneRoot);
+
+			PicrossEditor picrossEditor = new PicrossEditor(rowCount, colCount);
+
+			ScrollPane scrollPanePicross = picrossEditor.getScrollPaneAsParent();
+			scrollPanePicross.hbarPolicyProperty().setValue(ScrollPane.ScrollBarPolicy.ALWAYS);
+			scrollPanePicross.vbarPolicyProperty().setValue(ScrollPane.ScrollBarPolicy.ALWAYS);
+			scrollPanePicross.setFitToHeight(true);
+			scrollPanePicross.setFitToWidth(true);
+			scrollPanePicross.setOnMouseClicked(e -> picrossEditor.requestFocus());
+			borderPaneRoot.setCenter(scrollPanePicross);
 			
-			Button btnBack = new Button("Back");
-			btnBack.setOnAction(e -> {
-				backConfirm(stage, picross);
-				picross.requestFocus();
-			});
-			
-			Pane spacer1 = new Pane();
-			HBox.setHgrow(spacer1, Priority.ALWAYS);
-			
-			Button btnCheck = new Button("Check Solvability");
-			btnCheck.setOnAction(e -> {
-				displaySolvability(picross.getLabels(), picross.getMatrix(false), numCols, numRows);
-				picross.requestFocus();
+			Button buttonBack = new Button("Back");
+			buttonBack.setOnAction(e -> {
+				if (picrossEditor.hasUnsavedChanges()) {
+					confirmAbandonUnsavedWork(stage, picrossEditor);
+				} else {
+					picrossEditor.timer.stop();
+					getDimensionsForEditor(stage, true);
+				}
+				picrossEditor.requestFocus();
 			});
 			
-			Pane spacer2 = new Pane();
-			HBox.setHgrow(spacer2, Priority.ALWAYS);
+			Pane paneSpacer1 = new Pane();
+			HBox.setHgrow(paneSpacer1, Priority.ALWAYS);
 			
-			Button btnSave = new Button("Save");
-			btnSave.setOnAction(e -> {
+			Button buttonSolve = new Button("Check Solvability");
+			buttonSolve.setOnAction(e -> {
+				displaySolvability(picrossEditor.getRowLabels(), picrossEditor.getColLabels(), Optional.of(picrossEditor.getMatrix()), rowCount, colCount, Optional.of(stage.heightProperty().doubleValue()), Optional.of(stage.widthProperty().doubleValue()));
+				picrossEditor.requestFocus();
+			});
+			
+			Pane paneSpacer2 = new Pane();
+			HBox.setHgrow(paneSpacer2, Priority.ALWAYS);
+			
+			Button buttonSave = new Button("Save");
+			buttonSave.setOnAction(e -> {
 				FileChooser fileChooser = new FileChooser();
 				fileChooser.setTitle("Select a Save Location");
 				fileChooser.getExtensionFilters().add(new ExtensionFilter("CSV Files", "*.csv"));
+
 				File savedWork = fileChooser.showSaveDialog(stage);
-				picross.saveWork(savedWork);
-				picross.requestFocus();
+				picrossEditor.saveWork(savedWork);
+				picrossEditor.requestFocus();
 			});
 			
-			HBox options = new HBox(btnBack, spacer1, btnCheck, spacer2, btnSave);
-			options.setPadding(new Insets(10,10,10,10));
+			HBox hBoxOptions = new HBox(buttonBack, paneSpacer1, buttonSolve, paneSpacer2, buttonSave);
+			hBoxOptions.setPadding(new Insets(10,10,10,10));
 			
-			Label instr = new Label("Z: Fill in square.  C: Clear square.\n" +
+			Label labelInstructions = new Label("Z: Fill in square.  C: Clear square.\n" +
 					"Arrow Keys: Move cursor. Click to jump to square.");
-			instr.setTextAlignment(TextAlignment.CENTER);
-			instr.setPadding(new Insets(10,10,10,10));
+			labelInstructions.setTextAlignment(TextAlignment.CENTER);
+			labelInstructions.setPadding(new Insets(10,10,10,10));
 			
-			VBox header = new VBox(options, instr);
-			header.setAlignment(Pos.CENTER);
-			root.setTop(header);
+			VBox vBoxHeader = new VBox(hBoxOptions, labelInstructions);
+			vBoxHeader.setAlignment(Pos.CENTER);
+			borderPaneRoot.setTop(vBoxHeader);
 			
-			stage.setScene(creator);
-			stage.sizeToScene();
-			stage.setHeight(Math.max((int) Math.ceil(1.4 * numRows) * PicrossGrid.cellSize + 150, 450));
-			stage.setWidth(Math.max((int) Math.ceil(1.3 * numCols) * PicrossGrid.cellSize, 400));
+			stage.setScene(sceneEditor);
+			stage.setOnCloseRequest(e -> picrossEditor.timer.stop());
 			
-			picross.timer.start();
-			
-			Platform.runLater(() -> picross.requestFocus());
+			picrossEditor.timer.start();
 
-			return picross;
+
+			picrossEditor.requestFocus();
+			Platform.runLater(() -> picrossEditor.requestFocus());
+
+			return Optional.of(picrossEditor);
 		} catch(Exception e) {
 			e.printStackTrace();
-			return null;
+			displayFailedLoadWindow(stage, "Failed to open editor!\nI'm not sure how you got here ¯\\_(ツ)_/¯");
+			return Optional.empty();
 		}
 	}
 	
-	//new window with results of solver
-	public void displaySolvability(int[][][] labels, int[][] solution, int numCols, int numRows) {
+	public void displaySolvability(int[][] rowHeaders, int[][] colHeaders, Optional<int[][]> solution, int rowCount, int colCount, Optional<Double> height, Optional<Double> width) {
         try {
             Stage secondaryStage = new Stage();
-			int height = Math.max((int) Math.ceil(1.4 * numRows) * PicrossGrid.cellSize + 150, 450);
-            secondaryStage.setHeight(height);
-            secondaryStage.setMinHeight(height);
-			int width = Math.max((int) Math.ceil(1.3 * numCols) * PicrossGrid.cellSize, 400);
-            secondaryStage.setWidth(width);
-            secondaryStage.setMinWidth(width);
+			setStageSize(secondaryStage, height.orElse(Math.max(Math.ceil(1.4 * rowCount) * PicrossGrid.cellSize + 150.0, 450.0)), width.orElse(Math.max(Math.ceil(1.3 * colCount) * PicrossGrid.cellSize, 400.0)));
 
-            PicrossGrid picturePicross = new PicrossGrid(numCols, numRows, false);
-			picturePicross.overrideLabels(labels);
-            picturePicross.getStylesheets().add(getClass().getResource("picross.css").toExternalForm());
-			picturePicross.setAllUnknown();
-			PicrossSolver solver = new PicrossSolver(labels, solution, picturePicross);
+            BorderPane borderPaneCheck = new BorderPane();
+            Label labelResult = new Label();
+            labelResult.setTextAlignment(TextAlignment.CENTER);
+            labelResult.setPadding(new Insets(10,10,10,10));
+            borderPaneCheck.setTop(labelResult);
 
-            BorderPane check = new BorderPane();
-            Label result = new Label();
-            result.setTextAlignment(TextAlignment.CENTER);
-            result.setPadding(new Insets(10,10,10,10));
-            check.setTop(result);
+            Pane paneSpacer1 = new Pane();
+            HBox.setHgrow(paneSpacer1, Priority.ALWAYS);
 
-            Pane Hspacer = new Pane();
-            HBox.setHgrow(Hspacer, Priority.ALWAYS);
+			PicrossViewer picrossViewer = new PicrossViewer(rowCount, colCount, rowHeaders, colHeaders, new PicrossSolver(rowHeaders, colHeaders, solution));
+            ScrollPane scrollPanePicturePicross = new ScrollPane(picrossViewer.getGroupAsParent());
+            borderPaneCheck.setCenter(scrollPanePicturePicross);
 
-            ScrollPane scrollPicturePicross = new ScrollPane(new Group(picturePicross));
-            check.setCenter(scrollPicturePicross);
-
-			Scene secondaryScene = new Scene(check);
+			Scene secondaryScene = new Scene(borderPaneCheck);
             secondaryStage.setScene(secondaryScene);
+			secondaryStage.setOnCloseRequest(e -> picrossViewer.timer.stop());
             secondaryStage.show();
 
-			new Thread() {
-				public void run() {
-					//The delay is only to allow for the second window to show before the solver starts going
-					try {
-						sleep(600);
-					} catch (Exception e) {}
-					boolean solvable = solver.solvable();
+			Platform.runLater(() -> picrossViewer.timer.start());
 
-					//Platform.runLater is necesary for thread-safe updates to UI
-					Platform.runLater(() -> {
-						HBox buttons;
-						if (solvable) {
-							result.setText("Solvable! Do you want to export the puzzle to .png?");
-
-							FileChooser fileChooser = new FileChooser();
-							fileChooser.setTitle("Select a Save Location");
-							fileChooser.getExtensionFilters().add(new ExtensionFilter("PNG Files", "*.png"));
-
-							Button btnEUnsolved = new Button("Export Unsolved");
-							btnEUnsolved.setOnAction(ex -> {
-								File unsolvedPuzzle = fileChooser.showSaveDialog(secondaryStage);
-								picturePicross.exportUnsolved(unsolvedPuzzle);
-							});
-
-							Pane spacer = new Pane();
-							HBox.setHgrow(spacer, Priority.ALWAYS);
-
-							Button btnESolved = new Button("Export Solved");
-							btnESolved.setOnAction(ex -> {
-								File solvedPuzzle = fileChooser.showSaveDialog(secondaryStage);
-								picturePicross.export(solvedPuzzle);
-							});
-
-							buttons = new HBox(btnEUnsolved, spacer, btnESolved);
-						} else {
-							result.setText("Not Solvable!");
-
-							Button btnOK = new Button("OK");
-							btnOK.setOnAction(ex -> {
-								secondaryStage.close();
-							});
-							btnOK.setPadding(new Insets(10,10,10,10));
-							check.setBottom(btnOK);
-
-							buttons = new HBox(btnOK);
-						}
-						buttons.setPadding(new Insets(10,10,10,10));
-						check.setBottom(buttons);
-					});
-				}
-			}.start();
+			picrossViewer.setUIUpdateOnComplete(() -> updateSolverWindowWhenFinished(secondaryStage, borderPaneCheck, labelResult, picrossViewer));
+			picrossViewer.setUIUpdateAddSkipAnimationButton(() -> addSkipSolverAnimationButton(borderPaneCheck, picrossViewer));
         } catch (Exception e) {
             e.printStackTrace();
         }
 	}
-	
-	//if save data could not be loaded
-	public void failedLoad(Stage stage, PicrossGrid picross) {
-		picross.timer.stop();
-		
-		stage.setHeight(120);
-		stage.setMinHeight(120);
-		stage.setWidth(200);
-		stage.setMinWidth(200);
-		
-		Label warning = new Label("Failed to load data!");
-		warning.setTextAlignment(TextAlignment.CENTER);
-		warning.setPadding(new Insets(10,10,10,10));
-		
-		Button btnOK = new Button("OK");
-		btnOK.setOnAction(e -> {
-			getDimensions(stage, true);
-		});
-		
-		VBox fail = new VBox(warning, btnOK);
-		fail.setAlignment(Pos.CENTER);
-		fail.setPadding(new Insets(10,10,10,10));
-		
-		Scene confirm = new Scene(fail);
-		stage.setScene(confirm);
-	}
-	
-	//be sure user wants to go back if saved work
-	public void backConfirm(Stage stage, PicrossGrid picross) {
-		if (picross.changed()) {
-			Stage secondaryStage = new Stage();
-			secondaryStage.setHeight(120);
-			secondaryStage.setMinHeight(120);
-			secondaryStage.setWidth(200);
-			secondaryStage.setMinWidth(200);
-			
-			Label warning = new Label("Leave without saving changes?");
-			warning.setTextAlignment(TextAlignment.CENTER);
-			
-			Button btnYes = new Button("Yes");
-			btnYes.setOnAction(e -> {
-				secondaryStage.close();
-				picross.timer.stop();
-				getDimensions(stage, true);
+
+	public void updateSolverWindowWhenFinished(Stage secondaryStage, BorderPane borderPaneCheck, Label labelResult, PicrossViewer picrossViewer) {
+		HBox hBoxButtons;
+		if (picrossViewer.getSolverResult().get()) {
+			labelResult.setText("Solvable! Do you want to export the puzzle to .png?");
+
+			FileChooser fileChooser = new FileChooser();
+			fileChooser.setTitle("Select a Save Location");
+			fileChooser.getExtensionFilters().add(new ExtensionFilter("PNG Files", "*.png"));
+
+			Button buttonExportUnsolved = new Button("Export Unsolved");
+			buttonExportUnsolved.setOnAction(ex -> {
+				File unsolvedPuzzle = fileChooser.showSaveDialog(secondaryStage);
+				picrossViewer.exportUnsolvedImage(unsolvedPuzzle);
 			});
-			
-			Pane spacer = new Pane();
-			HBox.setHgrow(spacer, Priority.ALWAYS);
-			
-			Button btnNo = new Button("No");
-			btnNo.setOnAction(e -> {
-				secondaryStage.close();
+
+			Pane paneSpacer2 = new Pane();
+			HBox.setHgrow(paneSpacer2, Priority.ALWAYS);
+
+			Button buttonExportSolved = new Button("Export Solved");
+			buttonExportSolved.setOnAction(ex -> {
+				File solvedPuzzle = fileChooser.showSaveDialog(secondaryStage);
+				picrossViewer.exportImage(solvedPuzzle);
 			});
-			
-			HBox buttons = new HBox(btnYes, spacer, btnNo);
-			buttons.setPadding(new Insets(10,10,10,10));
-			
-			VBox check = new VBox(warning, buttons);
-			check.setPadding(new Insets(10,10,10,10));
-			
-			Scene confirm = new Scene(check);
-			secondaryStage.setScene(confirm);
-			secondaryStage.show();
+
+			hBoxButtons = new HBox(buttonExportUnsolved, paneSpacer2, buttonExportSolved);
 		} else {
-			picross.timer.stop();
-			getDimensions(stage, true);
+			labelResult.setText("Not Solvable!");
+
+			Button buttonOK = new Button("OK");
+			buttonOK.setOnAction(ex -> secondaryStage.close());
+			hBoxButtons = new HBox(buttonOK);
+
+			borderPaneCheck.setBottom(hBoxButtons);
 		}
+		hBoxButtons.setPadding(new Insets(10,10,10,10));
+		borderPaneCheck.setBottom(hBoxButtons);
+	}
+
+	public void addSkipSolverAnimationButton(BorderPane borderPaneCheck, PicrossViewer picrossViewer) {
+		Button buttonSkipAnimation = new Button("Skip Animation");
+
+		HBox hBoxSkipButton = new HBox(buttonSkipAnimation);
+		hBoxSkipButton.setPadding(new Insets(10,10,10,10));
+		
+		borderPaneCheck.setBottom(hBoxSkipButton);
+
+		buttonSkipAnimation.setOnAction(ex -> {
+			picrossViewer.skipRemainingAnimation();
+			buttonSkipAnimation.setDisable(true);
+			borderPaneCheck.setBottom(new Pane());
+		});
 	}
 	
-	//get row headers from user for solver
-	public void getRows(Stage stage, int numCols, int numRows, int[][] rowLabels, String[] colLabels) {
-		stage.setWidth(650);
-		stage.setMinWidth(650);
-		stage.setHeight(650);
-		stage.setMinHeight(650);
-		BorderPane root = new BorderPane();
-		Scene solve = new Scene(root);
+	public void confirmAbandonUnsavedWork(Stage stage, PicrossEditor picross) {
+		Stage secondaryStage = new Stage();
+		setStageSize(secondaryStage, 120.0, 200.0);
 		
-		Button btnBack = new Button("Back");
-		btnBack.setOnAction(e -> {
-			getDimensions(stage, false);
+		Label buttonWarning = new Label("Leave without saving changes?");
+		buttonWarning.setTextAlignment(TextAlignment.CENTER);
+		
+		Button buttonYes = new Button("Yes");
+		buttonYes.setOnAction(e -> {
+			secondaryStage.close();
+			picross.timer.stop();
+			getDimensionsForEditor(stage, true);
 		});
-		HBox HBback = new HBox(btnBack);
-		HBback.setAlignment(Pos.CENTER_LEFT);
-		HBback.setPadding(new Insets(10,10,10,10));
 		
-		//tell user what to do
-		Label instr = new Label("Input row numbers separated by single spaces.\n"
-				+ "You can press Tab to move to the next text box.");
-		instr.setTextAlignment(TextAlignment.CENTER);
-		instr.setPadding(new Insets(10,10,10,10));
+		Pane paneSpacer = new Pane();
+		HBox.setHgrow(paneSpacer, Priority.ALWAYS);
 		
-		VBox header = new VBox(HBback, instr);
-		header.setAlignment(Pos.CENTER);
-		root.setTop(header);
+		Button buttonNo = new Button("No");
+		buttonNo.setOnAction(e -> secondaryStage.close());
 		
-		//take row numbers
-		Label[] pointersToRowErrors = new Label[numRows];
-		TextField[] pointersToRowFields = new TextField[numRows];
-		GridPane rowInputs = getInputter(pointersToRowErrors, pointersToRowFields, true);
-		ScrollPane scrollRows = new ScrollPane(rowInputs);
-		root.setCenter(scrollRows);
+		HBox hBoxButtons = new HBox(buttonYes, paneSpacer, buttonNo);
+		hBoxButtons.setPadding(new Insets(10,10,10,10));
 		
-		if (rowLabels != null) {
-			for (int r = 0; r < numRows; r++) {
-				pointersToRowFields[r].setText(Arrays.stream(rowLabels[r])
-						.mapToObj(String::valueOf)
-						.collect(Collectors.joining(" ")));
-			}
-		} 
-		Button btnNext = new Button("Next");
-		btnNext.setOnAction(e -> {
-			int[][] newRowLabels = new int[numRows][];
-			boolean acceptAll = validateInputs(pointersToRowErrors, pointersToRowFields, newRowLabels, numCols, true);
-			if (acceptAll) {
-				getCols(stage, numCols, numRows, newRowLabels, colLabels);
-			}
-		});
-		HBox HBNext = new HBox(btnNext);
+		VBox vboxCheck = new VBox(buttonWarning, hBoxButtons);
+		vboxCheck.setPadding(new Insets(10,10,10,10));
+		
+		Scene confirm = new Scene(vboxCheck);
+		secondaryStage.setScene(confirm);
+		secondaryStage.show();
+	}
+
+	public void getManualInput(Stage stage, int rowCount, int colCount) {
+		setStageSize(stage, 650.0, 650.0);
+		
+		BorderPane borderPaneRoot = new BorderPane();
+		Scene scene = new Scene(borderPaneRoot);
+		
+		Button buttonBack = new Button("Back");
+		HBox hBoxBack = new HBox(buttonBack);
+		hBoxBack.setAlignment(Pos.CENTER_LEFT);
+		hBoxBack.setPadding(new Insets(10,10,10,10));
+		
+		Label labelInstructions = new Label("Input numbers.\nYou can press Tab to move to the next box.");
+		labelInstructions.setTextAlignment(TextAlignment.CENTER);
+		labelInstructions.setPadding(new Insets(10,10,10,10));
+		
+		VBox vBoxHeader = new VBox(hBoxBack, labelInstructions);
+		vBoxHeader.setAlignment(Pos.CENTER);
+		borderPaneRoot.setTop(vBoxHeader);
+
+		InputAndError[] rowFields = new InputAndError[rowCount];
+		GridPane gridPaneRowInputs = getRowInputter(rowFields);
+		ScrollPane scrollPaneRowFields = new ScrollPane(gridPaneRowInputs);
+
+		InputAndError[] colFields = new InputAndError[colCount];
+		GridPane gridPaneColInputs = getColInputter(colFields);
+		gridPaneColInputs.setRotate(-90);
+		ScrollPane scrollPaneColFields = new ScrollPane(new Group(gridPaneColInputs));
+		scrollPaneColFields.setFitToHeight(true);
+		scrollPaneColFields.setFitToWidth(true);
+
+		Button buttonNext = new Button("Next");
+		HBox HBNext = new HBox(buttonNext);
 		HBNext.setAlignment(Pos.CENTER);
 		HBNext.setPadding(new Insets(10,10,10,10));
-		root.setBottom(HBNext);
+		borderPaneRoot.setBottom(HBNext);
 		
-		stage.setScene(solve);
-		
-		Platform.runLater(()->pointersToRowFields[0].requestFocus());
+		stage.setScene(scene);
+
+		int[][] rowInputs = new int[rowCount][];
+		int[][] colInputs = new int[colCount][];
+		setManualInputToTakeRows(stage, borderPaneRoot, buttonBack, buttonNext, rowCount, colCount, rowFields, scrollPaneRowFields, colFields, scrollPaneColFields, rowInputs, colInputs);
 	}
 	
-	//get col headers from user for solver
-	public void getCols(Stage stage, int numCols, int numRows, int[][] rowLabels, String[] colLabels) {
-		stage.setWidth(650);
-		stage.setMinWidth(650);
-		stage.setHeight(650);
-		stage.setMinHeight(650);
-		BorderPane root = new BorderPane();
-		Scene solve = new Scene(root);
-		
-		Button btnBack = new Button("Back");
-		HBox HBBack = new HBox(btnBack);
-		HBBack.setAlignment(Pos.CENTER_LEFT);
-		HBBack.setPadding(new Insets(10,10,10,10));
-		
-		//tell user what to do
-		Label instr = new Label("Input column numbers separated by single spaces.\n"
-				+ "You can press Tab to move to the next text box.");
-		instr.setTextAlignment(TextAlignment.CENTER);
-		instr.setPadding(new Insets(10,10,10,10));
-		
-		VBox header = new VBox(HBBack, instr);
-		header.setAlignment(Pos.CENTER);
-		root.setTop(header);
-		
-		//take col numbers
-		Label[] pointersToColErrors = new Label[numCols];
-		TextField[] pointersToColFields = new TextField[numCols];
-		GridPane colInputs = getInputter(pointersToColErrors, pointersToColFields, false);
-		colInputs.setRotate(-90);
-		ScrollPane scrollCols = new ScrollPane(new Group(colInputs));
-		scrollCols.setFitToHeight(true);
-		scrollCols.setFitToWidth(true);
-		root.setCenter(scrollCols);
-		
-		btnBack.setOnAction(e -> {
-			String[] newColLabels = new String[numCols];
-			for (int c = 0; c < numCols; c++) {
-				newColLabels[c] = pointersToColFields[c].getText();
+	private void setManualInputToTakeRows(Stage stage, BorderPane borderPaneRoot, Button buttonBack, Button buttonNext, int rowCount, int colCount, InputAndError[] rowFields, ScrollPane scrollPaneRowFields, InputAndError[] colFields, ScrollPane scrollPaneColFields, int[][] rowInputs, int[][] colInputs) {
+		buttonBack.setOnAction(e -> getDimensionsForEditor(stage, false));
+
+		buttonNext.setOnAction(e -> setManualInputToTakeCols(stage, borderPaneRoot, buttonBack, buttonNext, rowCount, colCount, rowFields, scrollPaneRowFields, colFields, scrollPaneColFields, rowInputs, colInputs));
+
+		borderPaneRoot.addEventHandler(KeyEvent.KEY_PRESSED, ev -> {
+			if (ev.getCode() == KeyCode.ENTER) {
+				buttonNext.fire();
+				ev.consume();  
 			}
-			getRows(stage, numCols, numRows, rowLabels, newColLabels);
+		});
+		
+		borderPaneRoot.setCenter(scrollPaneRowFields);
+		
+		Platform.runLater(() -> rowFields[0].Input.requestFocus());
+	}
+
+	private void setManualInputToTakeCols(Stage stage, BorderPane borderPaneRoot, Button buttonBack, Button buttonNext, int rowCount, int colCount, InputAndError[] rowFields, ScrollPane scrollPaneRowFields, InputAndError[] colFields, ScrollPane scrollPaneColFields, int[][] rowInputs, int[][] colInputs) {
+		if (!validateInputs(rowFields, rowInputs, colCount)) {
+			return;
+		}
+		
+		buttonBack.setOnAction(e -> setManualInputToTakeRows(stage, borderPaneRoot, buttonBack, buttonNext, rowCount, colCount, rowFields, scrollPaneRowFields, colFields, scrollPaneColFields, rowInputs, colInputs));
+
+		buttonNext.setOnAction(e -> {
+			if (validateInputs(colFields, colInputs, rowCount)) {
+				displaySolvability(rowInputs, colInputs, Optional.empty(), rowCount, colCount, Optional.empty(), Optional.empty());
+			}
 		});
 
-		if (colLabels != null) {
-			for (int c = 0; c < numCols; c++) {
-				pointersToColFields[c].setText(colLabels[c]);
-			}
-		}
-		Button btnSubmit = new Button("Submit");
-		btnSubmit.setOnAction(e -> {
-			int[][] newColLabels = new int[numCols][];
-			boolean acceptAll = validateInputs(pointersToColErrors, pointersToColFields, newColLabels, numRows, false);
-			if (acceptAll) {
-				int [][][] labels = {newColLabels, rowLabels};
-				displaySolvability(labels, null, numCols, numRows);
+		borderPaneRoot.addEventHandler(KeyEvent.KEY_PRESSED, ev -> {
+			if (ev.getCode() == KeyCode.ENTER) {
+				buttonNext.fire();
+				ev.consume();  
 			}
 		});
-		HBox HBSubmit = new HBox(btnSubmit);
-		HBSubmit.setAlignment(Pos.CENTER);
-		HBSubmit.setPadding(new Insets(10,10,10,10));
-		root.setBottom(HBSubmit);
 		
-		stage.setScene(solve);
+		borderPaneRoot.setCenter(scrollPaneColFields);
 		
-		Platform.runLater(()->pointersToColFields[0].requestFocus());
+		Platform.runLater(() -> colFields[0].Input.requestFocus());
+	}
+
+	public GridPane getRowInputter(InputAndError[] inputs) {
+		return getInputter(inputs, " Row ");
+	}
+
+	public GridPane getColInputter(InputAndError[] inputs) {
+		return getInputter(inputs, " Col ");
 	}
 	
-	//create gridpane to take numbers for rows and columns
-	public GridPane getInputter(Label[] errors, TextField[] fields, boolean rows) {
-		GridPane inputs = new GridPane();
-		for (int i = 0; i < errors.length; i++) {
-			Label error = new Label();
-			error.setPadding(new Insets(10,10,10,10));
-			error.setTextFill(Color.web("#ff0000"));
-			errors[i] = error;
-			HBox HBError = new HBox(error);
-			HBError.setAlignment(Pos.CENTER_RIGHT);
-			HBError.setPrefWidth(200);
+	public GridPane getInputter(InputAndError[] fields, String rowOrCol) {
+		GridPane gridPaneInputs = new GridPane();
+		for (int i = 0; i < fields.length; i++) {
+			fields[i] = new InputAndError();
+
+			fields[i].Error.setPadding(new Insets(10,10,10,10));
+			fields[i].Error.setTextFill(RED);
+			HBox hBoxError = new HBox(fields[i].Error);
+			hBoxError.setAlignment(Pos.CENTER_RIGHT);
+			hBoxError.setPrefWidth(200);
 			
-			TextField input = new TextField();
-			input.setPrefWidth(200);
-			fields[i] = input;
-			
-			Label lbl = new Label();
+			fields[i].Input.setPrefWidth(200);
 			
 			Pane spacer = new Pane();
 			spacer.setPrefWidth(20);
 			
-			if (rows) {
-				lbl.setText(" Row " + (i + 1));
-				input.setAlignment(Pos.CENTER_RIGHT);
-			} else {
-				lbl.setText(" Col " + (i + 1));
-				input.setAlignment(Pos.CENTER_LEFT);
-			}
+			Label labelInput = new Label();
+			labelInput.setText(rowOrCol + (i + 1));
+			labelInput.setAlignment(Pos.CENTER_RIGHT);
 			
-			GridPane.setConstraints(HBError, 0, i);
-			GridPane.setConstraints(input, 1, i);
-			GridPane.setConstraints(lbl, 2, i);
+			GridPane.setConstraints(hBoxError, 0, i);
+			GridPane.setConstraints(fields[i].Input, 1, i);
+			GridPane.setConstraints(labelInput, 2, i);
 			GridPane.setConstraints(spacer, 3, i);
 			
-			inputs.getChildren().addAll(HBError, input, lbl, spacer);
+			gridPaneInputs.getChildren().addAll(hBoxError, fields[i].Input, labelInput, spacer);
 		}
-		return inputs;
+		return gridPaneInputs;
 	}
 	
-	//make sure user input is not illogical on the face
-	public boolean validateInputs(Label[] errors, TextField[] inputs, int[][] newLabels, int numPerp, boolean rows) {
-		boolean acceptAll = true;
-		for (int i = 0; i < errors.length; i++) {
-			boolean accept = false;
-			String[] temp = inputs[i].getText().trim().split(" ");
-			int numsLen = temp.length;
-			String[] nums = Arrays.copyOf(temp, numsLen);
-			if (!rows) {
-				for (int j = 0; j < numsLen / 2; j++) {
-			        nums[j] = temp[numsLen - 1 - j];
-			        nums[numsLen - 1 - j] = temp[j];
-			    }
+	public boolean validateInputs(InputAndError[] fields, int[][] inputs, int maxLength) {
+		boolean accept = true;
+		for (int inputIndex = 0; inputIndex < fields.length; inputIndex++) {
+			// regex splits string by any sections of non-numeric characters
+			String[] nums = fields[inputIndex].Input.getText().split("[^0-9]+");
+			int numCount = nums.length;
+			if (numCount > 1 && nums[0].equals("")) {
+				nums = Arrays.copyOfRange(nums, 1, numCount);
+				numCount--;
 			}
-			String num = " ";
-			int[] numInts = new int[numsLen];
+
+			fields[inputIndex].Input.setText(String.join(" ", nums));
+			int numIndex = 0;
+
+			if (fields[inputIndex].Input.getText().length() == 0) {
+				accept = setManualInputError("Please input numbers.", fields[inputIndex]);
+				continue;
+			}
+
 			int sum = 0;
-			for (int n = 0; n < numsLen; n++) {
-				try {
-					num = nums[n];
-					int numInt = Integer.parseInt(num.trim());
-					numInts[n] = numInt;
-					accept = true;
-					if (numInt < 0) {
-						errors[i].setText("Please input positive integers. ");
-						inputs[i].setStyle("-fx-text-fill: red;");
-						accept = false;
-						break;
-					} else if (numInt == 0 && numsLen > 1) {
-						errors[i].setText("Please review the 0 entry here. ");
-						inputs[i].setStyle("-fx-text-fill: red;");
-						accept = false;
-						break;
-					}
-					sum += numInt;
-				} catch(Exception ex) {
-					errors[i].setText("Please input positive integers. ");
-					inputs[i].setStyle("-fx-text-fill: red;");
-					accept = false;
+			int[] numInts = new int[numCount];
+			boolean hasZero = false;
+			while (numIndex < numCount) {
+				int numInt = Integer.parseInt(nums[numIndex]);
+				sum += numInt;
+				numInts[numIndex] = numInt;
+
+				if (numInt == 0 && numCount > 1) {
+					hasZero = true;
 					break;
 				}
+				numIndex++;
+			}
+			if (hasZero) {
+				accept = setManualInputError("Please review the 0 entry here.", fields[inputIndex]);
+				continue;
+			}
+
+			if (sum + numCount - 1 > maxLength) {
+				accept = setManualInputError("Total of entries is too large.", fields[inputIndex]);
+				continue;
 			}
 			
-			if (num.equals("")) {
-				errors[i].setText("Please review this entry. ");
-				inputs[i].setStyle("-fx-text-fill: red;");
-				accept = false;
-			} else if (sum + numsLen - 1 > numPerp) {
-				errors[i].setText("Total of entries is too large. ");
-				inputs[i].setStyle("-fx-text-fill: red;");
-				accept = false;
-			}
-			
-			if (accept) {
-				errors[i].setText("");
-				inputs[i].setStyle("-fx-text-fill: black;");
-				newLabels[i] = numInts;
-			} else {
-				acceptAll = false;
-			}
+			fields[inputIndex].Error.setText("");
+			fields[inputIndex].Input.setStyle("-fx-text-fill: black;");
+			inputs[inputIndex] = numInts;
 		}
-		return acceptAll;
+		return accept;
+	}
+
+	private boolean setManualInputError(String error, InputAndError field) {
+		field.Error.setText(error.trim() + " ");
+		field.Input.setStyle("-fx-text-fill: red;");
+		return false;
+	}
+
+	private void setStageSize(Stage stage, double height, double width) {
+		stage.setHeight(height);
+		stage.setWidth(width);
 	}
 	
 	public static void main(String[] args) {
