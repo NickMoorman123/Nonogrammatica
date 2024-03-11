@@ -1,22 +1,15 @@
 package Picross;
 
-import java.awt.Desktop;
-import java.awt.image.RenderedImage;
-import java.io.File;
-import java.io.IOException;
 import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.PrimitiveIterator;
 import java.util.function.Function;
 import java.util.stream.IntStream;
 
-import javax.imageio.ImageIO;
-
 import Solver.PicrossSolver;
 import javafx.animation.AnimationTimer;
 import javafx.application.Platform;
 import javafx.collections.ObservableList;
-import javafx.embed.swing.SwingFXUtils;
 import javafx.geometry.HPos;
 import javafx.geometry.Pos;
 import javafx.geometry.VPos;
@@ -214,36 +207,6 @@ public abstract class PicrossGrid {
 		topLeft.setMaxWidth(newWidth);
 		for (RowText text : rowPicrossTexts) {
 			text.setWidth(newWidth);
-		}
-	}
-	
-	public void exportImage(File puzzle) {
-		try {
-			WritableImage puzzleImage = new WritableImage((int) getWidth(), (int) getHeight());
-            snapshot(null, puzzleImage);
-            RenderedImage renderedImage = SwingFXUtils.fromFXImage(puzzleImage, null);
-            ImageIO.write(renderedImage, "png", puzzle);
-            Desktop.getDesktop().open(puzzle);
-		} catch (IOException ex) {
-			ex.printStackTrace();
-		}
-	}
-	
-	public void exportUnsolvedImage(File puzzle) {
-		LinkedList<PicrossPane> panesToRefill = new LinkedList<>();
-		for (PicrossPane[] paneRow : picrossPanes) {
-			for (PicrossPane pane : paneRow) {
-				if (pane.filled()) {
-					pane.clear();
-					panesToRefill.add(pane);
-				}
-			}
-		}
-		
-		exportImage(puzzle);
-		
-		for (PicrossPane pane : panesToRefill) {
-			pane.setFilled();
 		}
 	}
 

@@ -37,10 +37,18 @@
 	-fx-background-color: black ;
 }
 
+.temp-uncrossed.cross-back-slash {
+	-fx-background-color: white ;
+}
+
 .cross-forward-slash {
 	-fx-shape: "M 15,3 L 3,15 L 4,16 L 16,4 Z" ;
 	-fx-scale-shape: false ;
 	-fx-background-color: black ;
+}
+
+.temp-uncrossed.cross-forward-slash {
+	-fx-background-color: white ;
 }
 
 .after-fifth-row {

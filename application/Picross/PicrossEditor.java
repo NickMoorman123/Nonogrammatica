@@ -122,7 +122,7 @@ public class PicrossEditor extends PicrossGrid {
 		try (Writer writer = new BufferedWriter(new FileWriter(file))) {
 			writer.write(rowCount + "," + colCount + (",x").repeat(colCount - 2) + "\n");
 			
-			IntStream.rangeClosed(1, rowCount)
+			IntStream.range(0, rowCount)
 					 .forEach(rowIndex -> saveRow(writer, rowIndex));
 			
 			unsavedChanges = false;
@@ -133,7 +133,7 @@ public class PicrossEditor extends PicrossGrid {
 
 	private void saveRow(Writer writer, int rowIndex) throws RuntimeException {
 		try {
-			writer.write(IntStream.rangeClosed(1, colCount)
+			writer.write(IntStream.range(0, colCount)
 								  .map(colIndex -> picrossPanes[rowIndex][colIndex].filled() ? PicrossSolver.FILLED_CELL : PicrossSolver.CROSSED_CELL)
 								  .mapToObj(String::valueOf)
 								  .collect(Collectors.joining(",")) + "\n");

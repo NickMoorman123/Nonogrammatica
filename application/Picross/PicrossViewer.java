@@ -1,5 +1,10 @@
 package Picross;
 
+import java.awt.Desktop;
+import java.awt.image.RenderedImage;
+import java.io.File;
+import java.io.IOException;
+import java.util.LinkedList;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
@@ -7,9 +12,16 @@ import java.util.concurrent.Executors;
 import java.util.function.IntConsumer;
 import java.util.stream.IntStream;
 
+import javax.imageio.ImageIO;
+
 import Solver.PicrossSolver;
 import Solver.SolutionDisplayStep;
 import javafx.application.Platform;
+import javafx.embed.swing.SwingFXUtils;
+import javafx.scene.image.WritableImage;
+import javafx.stage.FileChooser;
+import javafx.stage.FileChooser.ExtensionFilter;
+import javafx.stage.Stage;
 
 public class PicrossViewer extends PicrossGrid {
     private ConcurrentLinkedQueue<SolutionDisplayStep> solutionDisplaySteps;
@@ -95,5 +107,50 @@ public class PicrossViewer extends PicrossGrid {
 
 	public Optional<Boolean> getSolverResult() {
 		return solverResult;
+	}
+	
+	public void exportImage(Stage stage) {
+		try {
+			FileChooser fileChooser = new FileChooser();
+			fileChooser.setTitle("Select a Save Location");
+			fileChooser.getExtensionFilters().add(new ExtensionFilter("PNG Files", "*.png"));
+
+			File puzzle = fileChooser.showSaveDialog(stage);
+
+			WritableImage puzzleImage = new WritableImage((int) getWidth(), (int) getHeight());
+            snapshot(null, puzzleImage);
+            RenderedImage renderedImage = SwingFXUtils.fromFXImage(puzzleImage, null);
+            ImageIO.write(renderedImage, "png", puzzle);
+            Desktop.getDesktop().open(puzzle);
+		} catch (IOException ioe) {
+			ioe.printStackTrace();
+		} catch (IllegalArgumentException iae) {
+			iae.printStackTrace();
+		}
+	}
+	
+	public void exportUnsolvedImage(Stage stage) {
+		LinkedList<PicrossPane> panesToRefill = new LinkedList<>();
+		LinkedList<PicrossPane> panesToRecross = new LinkedList<>();
+		for (PicrossPane[] paneRow : picrossPanes) {
+			for (PicrossPane pane : paneRow) {
+				if (pane.filled()) {
+					pane.clear();
+					panesToRefill.add(pane);
+				} else {
+					pane.uncross();
+					panesToRecross.add(pane);
+				}
+			}
+		}
+			
+		exportImage(stage);
+		
+		for (PicrossPane pane : panesToRefill) {
+			pane.setFilled();
+		}
+		for (PicrossPane pane : panesToRecross) {
+			pane.recross();
+		}
 	}
 }

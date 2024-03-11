@@ -1,6 +1,5 @@
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.InputStream;
 import java.util.Arrays;
 import java.util.Optional;
 import java.util.Scanner;
@@ -366,24 +365,14 @@ public class Main extends Application {
 		if (picrossViewer.getSolverResult().get()) {
 			labelResult.setText("Solvable! Do you want to export the puzzle to .png?");
 
-			FileChooser fileChooser = new FileChooser();
-			fileChooser.setTitle("Select a Save Location");
-			fileChooser.getExtensionFilters().add(new ExtensionFilter("PNG Files", "*.png"));
-
 			Button buttonExportUnsolved = new Button("Export Unsolved");
-			buttonExportUnsolved.setOnAction(ex -> {
-				File unsolvedPuzzle = fileChooser.showSaveDialog(secondaryStage);
-				picrossViewer.exportUnsolvedImage(unsolvedPuzzle);
-			});
+			buttonExportUnsolved.setOnAction(ex -> picrossViewer.exportUnsolvedImage(secondaryStage));
 
 			Pane paneSpacer2 = new Pane();
 			HBox.setHgrow(paneSpacer2, Priority.ALWAYS);
 
 			Button buttonExportSolved = new Button("Export Solved");
-			buttonExportSolved.setOnAction(ex -> {
-				File solvedPuzzle = fileChooser.showSaveDialog(secondaryStage);
-				picrossViewer.exportImage(solvedPuzzle);
-			});
+			buttonExportSolved.setOnAction(ex -> picrossViewer.exportImage(secondaryStage));
 
 			hBoxButtons = new HBox(buttonExportUnsolved, paneSpacer2, buttonExportSolved);
 		} else {

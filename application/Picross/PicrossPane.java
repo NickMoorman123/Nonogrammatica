@@ -7,6 +7,8 @@ class PicrossPane extends StackPane {
     private final int row;
     private final int col;
     private boolean filled;
+    private Pane crossForward = new Pane();
+    private Pane crossBack = new Pane();
     
     public PicrossPane(int row, int col) {
         this.row = row;
@@ -40,13 +42,21 @@ class PicrossPane extends StackPane {
     }
     
     public void setCrossed() {
-        Pane crossForward = new Pane();
         crossForward.getStyleClass().add("cross-forward-slash");
         crossForward.setPadding(new Insets(1,1,1,1));
-        Pane crossBack = new Pane();
         crossBack.getStyleClass().add("cross-back-slash");
         crossBack.setPadding(new Insets(5,5,5,5));
         this.getChildren().addAll(crossForward, crossBack);
+    }
+
+    public void uncross() {
+        crossForward.getStyleClass().add("temp-uncrossed");
+        crossBack.getStyleClass().add("temp-uncrossed");
+    }
+
+    public void recross() {
+        crossForward.getStyleClass().remove("temp-uncrossed");
+        crossBack.getStyleClass().remove("temp-uncrossed");
     }
     
     public void clear() {
