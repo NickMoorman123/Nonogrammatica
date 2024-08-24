@@ -24,30 +24,35 @@ import javafx.stage.FileChooser.ExtensionFilter;
 import javafx.stage.Stage;
 
 public class PicrossViewer extends PicrossGrid {
+	private PicrossSolver picrossSolver;
+	private ExecutorService solverExecutor;
     private ConcurrentLinkedQueue<SolutionDisplayStep> solutionDisplaySteps;
 	private PicrossText currentPicrossText;
 	private Runnable runnableOnComplete;
 	private Runnable runnableAddSkipAnimationButton;
 	private boolean addedButton = false;
+	private boolean triedGuessing = false;
 	private Optional<Boolean> solverResult = Optional.empty();
-    public PicrossViewer(int rowCount, int colCount, int[][] rowLabels, int[][] colLabels, PicrossSolver solver) {
+
+    public PicrossViewer(int rowCount, int colCount, int[][] rowHeaders, int[][] colHeaders, Optional<int[][]> solution) {
         super(rowCount, colCount);
+		picrossSolver = new PicrossSolver(rowHeaders, colHeaders, solution);
 
 		IntStream.range(0, rowCount)
 				 .iterator()
-				 .forEachRemaining((IntConsumer) row -> rowPicrossTexts[row].updateText(rowLabels[row]));
+				 .forEachRemaining((IntConsumer) row -> rowPicrossTexts[row].updateText(rowHeaders[row]));
 		IntStream.range(0, colCount)
 				 .iterator()
-				 .forEachRemaining((IntConsumer) col -> colPicrossTexts[col].updateText(colLabels[col]));
+				 .forEachRemaining((IntConsumer) col -> colPicrossTexts[col].updateText(colHeaders[col]));
 		
 		resizeLabels();
 
 		currentPicrossText = rowPicrossTexts[0];
 
-		ExecutorService solverExecutor = Executors.newSingleThreadExecutor();
-		solverExecutor.submit(() -> solverResult = Optional.of(solver.solvable()));
+		solverExecutor = Executors.newSingleThreadExecutor();
+		solverExecutor.submit(() -> solverResult = Optional.of(picrossSolver.solvable()));
 
-		solutionDisplaySteps = solver.getSolutionSteps();
+		solutionDisplaySteps = picrossSolver.getSolutionSteps();
     }
 
 	public void setUIUpdateOnComplete(Runnable onComplete) {
@@ -62,14 +67,15 @@ public class PicrossViewer extends PicrossGrid {
 		SolutionDisplayStep displayStep = solutionDisplaySteps.poll();
 
 		if (solverResult.isPresent()) { 
-			if (displayStep == null) {
-				currentPicrossText.removeFocused();
-				timer.stop();
-				Platform.runLater(runnableOnComplete);
-				return;
-			} else if (!addedButton) {
+			if (!addedButton) {
 				Platform.runLater(runnableAddSkipAnimationButton);
 				addedButton = true;
+			} else if (displayStep == null) {
+				currentPicrossText.removeFocused();
+				timer.stop();
+				addedButton = false;
+				Platform.runLater(runnableOnComplete);
+				return;
 			}
 		}
 
@@ -107,6 +113,18 @@ public class PicrossViewer extends PicrossGrid {
 
 	public Optional<Boolean> getSolverResult() {
 		return solverResult;
+	}
+
+	public void tryGuessAndCheck() {
+		triedGuessing = true;
+		solverResult = Optional.empty();
+		addedButton = false;
+		solverExecutor.submit(() -> solverResult = Optional.of(picrossSolver.solvableWithGuessAndCheck()));
+		timer.start();
+	}
+
+	public boolean triedGuessing() {
+		return triedGuessing;
 	}
 	
 	public void exportImage(Stage stage) {

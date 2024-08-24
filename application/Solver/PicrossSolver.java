@@ -34,18 +34,37 @@ public class PicrossSolver {
         }
         debug("Create solver on " + numRows + " rows and " + numCols + " cols");
 	}
+
+    private PicrossSolver(int[][] progress, int row, int col, int value, int[][] rowHeaders, int[][] colHeaders) {
+        numRows = progress.length;
+        numCols = progress[0].length;
+		intGrid = new int[numRows][numCols];
+
+        for (int rowIndex = 0; rowIndex < numRows; rowIndex++) {
+            intGrid[rowIndex] = progress[rowIndex].clone();
+        }
+        intGrid[row][col] = value;
+
+        this.rowHeaders = rowHeaders;
+        this.colHeaders = colHeaders;
+        this.solution = Optional.empty();
+    }
 	
 	public boolean solvable() {
         debug("Checking solvability");
         solve();
 
+        return finished();
+    }
+
+    private boolean finished() {
         if (impossible) {
 			return false;
 		}
         return !Arrays.stream(intGrid)
                       .anyMatch(row -> Arrays.stream(row)
                       .anyMatch(cell -> cell == EMPTY_CELL));
-	}
+    }
 
     public ConcurrentLinkedQueue<SolutionDisplayStep> getSolutionSteps() {
         return solutionDisplaySteps;
@@ -69,11 +88,91 @@ public class PicrossSolver {
                          .iterator()
                          .forEachRemaining((IntConsumer) this::updateColDoPerpendicularJumps);
 			}
-		} catch(Exception e) {
+		} catch(IllegalStateException e) {
             debug("Exiting due to impossibility: " + e);
 			impossible = true;
-		}
+		} catch(Exception e) {
+            debug("Other exception occurred" + e);
+            impossible = true;
+        }
 	}
+
+    public boolean solvableWithGuessAndCheck() {
+        while (runGuessAndCheckRoutine()) {
+            solve();
+        }
+
+        return finished();
+    }
+
+    private boolean runGuessAndCheckRoutine() {
+        //trying cells in spiral pattern because outermost are most likely to cause contradictions
+        int rowMin = 0;
+        int rowMax = numRows - 1;
+        int colMin = 0;
+        int colMax = numCols - 1;
+        int row = rowMin;
+        int col = colMin;
+        while (rowMin < rowMax || colMin < colMax) {
+            while (row < rowMax) {
+                if (couldFindContradiction(row, col, false)) {
+                    return true;
+                }
+                row++;
+            }
+            rowMax--;
+
+            while (col < colMax) {
+                if (couldFindContradiction(row, col, true)) {
+                    return true;
+                }
+                col++;
+            }
+            colMax--;
+
+            while (row > rowMin) {
+                if (couldFindContradiction(row, col, false)) {
+                    return true;
+                }
+                row--;
+            }
+            rowMin++;
+
+            while (col > colMin) {
+                if (couldFindContradiction(row, col, true)) {
+                    return true;
+                }
+                col--;
+            }
+            colMin++;
+        }
+
+        return false;
+    }
+
+    private boolean couldFindContradiction(int row, int col, boolean focusColNums) {
+        if (intGrid[row][col] != PicrossSolver.EMPTY_CELL) {
+            return false;
+        }
+
+        var solverWithFill = new PicrossSolver(intGrid, row, col, PicrossSolver.FILLED_CELL, rowHeaders, colHeaders);
+        solverWithFill.solve();
+        if (solverWithFill.impossible) {
+            intGrid[row][col] = PicrossSolver.CROSSED_CELL;
+            solutionDisplaySteps.add(new SolutionDisplayStep(row, col, PicrossSolver.CROSSED_CELL, focusColNums));
+            return true;
+        }
+
+        var solverWithCross = new PicrossSolver(intGrid, row, col, PicrossSolver.CROSSED_CELL, rowHeaders, colHeaders);
+        solverWithCross.solve();
+        if (solverWithCross.impossible) {
+            intGrid[row][col] = PicrossSolver.FILLED_CELL;
+            solutionDisplaySteps.add(new SolutionDisplayStep(row, col, PicrossSolver.FILLED_CELL, focusColNums));
+            return true;
+        }
+
+        return false;
+    }
 	
 	private boolean[] updateRow(int row) throws RuntimeException {
         debug("Try to update row " + row);
@@ -103,25 +202,23 @@ public class PicrossSolver {
         return rowsToUpdate;
 	}
 
-    private void updateCell(int row, int col, int index, int[] line, int[] newLine, boolean[] toUpdate, boolean isColumn) {
+    private void updateCell(int row, int col, int index, int[] line, int[] newLine, boolean[] toUpdate, boolean focusColNums) {
         if (newLine[index] == line[index]) {
             return;
         }
 
         if (line[index] != EMPTY_CELL) {
-            debug("Throwing exception. Tried to overwrite cell " + index);
-            throw new RuntimeException();
+            throw new IllegalStateException("Throwing exception. Tried to overwrite cell " + index);
         }
 
         if (solution.isPresent() && ((newLine[index] == CROSSED_CELL && solution.get()[row][col] != CROSSED_CELL) || (newLine[index] == FILLED_CELL && solution.get()[row][col] != FILLED_CELL))) {
-            debug("Throwing exception. Got cell " + index + " wrong. Line: " + Arrays.toString(line));
-            throw new RuntimeException();
+            throw new IllegalStateException("Throwing exception. Got cell " + index + " wrong. Line: " + Arrays.toString(line));
         }
         intGrid[row][col] = newLine[index];
         toUpdate[index] = true;
         foundInformation = true;
         
-        solutionDisplaySteps.add(new SolutionDisplayStep(row, col, newLine[index], isColumn));
+        solutionDisplaySteps.add(new SolutionDisplayStep(row, col, newLine[index], focusColNums));
     }
 
     private void updateRowDoPerpendicularJumps(int row) throws RuntimeException {

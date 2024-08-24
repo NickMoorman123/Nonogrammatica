@@ -316,7 +316,6 @@ public class Main extends Application {
 			
 			picrossEditor.timer.start();
 
-
 			picrossEditor.requestFocus();
 			Platform.runLater(() -> picrossEditor.requestFocus());
 
@@ -337,12 +336,13 @@ public class Main extends Application {
             Label labelResult = new Label();
             labelResult.setTextAlignment(TextAlignment.CENTER);
             labelResult.setPadding(new Insets(10,10,10,10));
+			labelResult.setText("Solving...");
             borderPaneCheck.setTop(labelResult);
 
             Pane paneSpacer1 = new Pane();
             HBox.setHgrow(paneSpacer1, Priority.ALWAYS);
 
-			PicrossViewer picrossViewer = new PicrossViewer(rowCount, colCount, rowHeaders, colHeaders, new PicrossSolver(rowHeaders, colHeaders, solution));
+			PicrossViewer picrossViewer = new PicrossViewer(rowCount, colCount, rowHeaders, colHeaders, solution);
             ScrollPane scrollPanePicturePicross = new ScrollPane(picrossViewer.getGroupAsParent());
             borderPaneCheck.setCenter(scrollPanePicturePicross);
 
@@ -362,8 +362,9 @@ public class Main extends Application {
 
 	public void updateSolverWindowWhenFinished(Stage secondaryStage, BorderPane borderPaneCheck, Label labelResult, PicrossViewer picrossViewer) {
 		HBox hBoxButtons;
+		String guessTag = picrossViewer.triedGuessing() ? " with guess and check" : "";
 		if (picrossViewer.getSolverResult().get()) {
-			labelResult.setText("Solvable! Do you want to export the puzzle to .png?");
+			labelResult.setText("Solvable" + guessTag + "! Do you want to export the puzzle to .png?");
 
 			Button buttonExportUnsolved = new Button("Export Unsolved");
 			buttonExportUnsolved.setOnAction(ex -> picrossViewer.exportUnsolvedImage(secondaryStage));
@@ -376,16 +377,29 @@ public class Main extends Application {
 
 			hBoxButtons = new HBox(buttonExportUnsolved, paneSpacer2, buttonExportSolved);
 		} else {
-			labelResult.setText("Not Solvable!");
+			labelResult.setText("Not solvable" + guessTag + "!");
+
+			Button buttonGuess = new Button("Try guess and check");
+			buttonGuess.setOnAction(ex -> doGuessAndCheck(borderPaneCheck, labelResult, picrossViewer));
+
+			Pane paneSpacer2 = new Pane();
+			HBox.setHgrow(paneSpacer2, Priority.ALWAYS);
 
 			Button buttonOK = new Button("OK");
 			buttonOK.setOnAction(ex -> secondaryStage.close());
-			hBoxButtons = new HBox(buttonOK);
+
+			hBoxButtons = !picrossViewer.triedGuessing() ? new HBox(buttonGuess, paneSpacer2, buttonOK) : new HBox(paneSpacer2, buttonOK);
 
 			borderPaneCheck.setBottom(hBoxButtons);
 		}
 		hBoxButtons.setPadding(new Insets(10,10,10,10));
 		borderPaneCheck.setBottom(hBoxButtons);
+	}
+
+	public void doGuessAndCheck(BorderPane borderPaneCheck, Label labelResult, PicrossViewer picrossViewer) {
+		borderPaneCheck.setBottom(new HBox());
+		labelResult.setText("Solving...");
+		picrossViewer.tryGuessAndCheck();
 	}
 
 	public void addSkipSolverAnimationButton(BorderPane borderPaneCheck, PicrossViewer picrossViewer) {
@@ -403,7 +417,7 @@ public class Main extends Application {
 		});
 	}
 	
-	public void confirmAbandonUnsavedWork(Stage stage, PicrossEditor picross) {
+	public void confirmAbandonUnsavedWork(Stage stage, PicrossEditor picrossEditor) {
 		Stage secondaryStage = new Stage();
 		setStageSize(secondaryStage, 120.0, 200.0);
 		
@@ -413,7 +427,7 @@ public class Main extends Application {
 		Button buttonYes = new Button("Yes");
 		buttonYes.setOnAction(e -> {
 			secondaryStage.close();
-			picross.timer.stop();
+			picrossEditor.timer.stop();
 			getDimensionsForEditor(stage, true);
 		});
 		

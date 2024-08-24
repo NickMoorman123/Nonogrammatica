@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.io.Writer;
 import java.util.Arrays;
 import java.util.Iterator;
+import java.util.PrimitiveIterator;
 import java.util.Scanner;
 import java.util.function.Function;
 import java.util.function.IntConsumer;
@@ -171,6 +172,21 @@ public class PicrossEditor extends PicrossGrid {
 			ex.printStackTrace();
 			return false;
 		}
+	}
+
+	public int[][] getMatrix() { 
+		int[][] matrix = new int[rowCount][colCount];
+		PrimitiveIterator.OfInt rowIterator = IntStream.range(0, rowCount).iterator();
+		while (rowIterator.hasNext()) {
+			int rowIndex = rowIterator.next();
+			PrimitiveIterator.OfInt colIterator = IntStream.range(0, colCount).iterator();
+			while (colIterator.hasNext()) {
+				int colIndex = colIterator.next();
+				matrix[rowIndex][colIndex] = (picrossPanes[rowIndex][colIndex].filled() ? PicrossSolver.FILLED_CELL : PicrossSolver.CROSSED_CELL);
+			}
+		}
+
+		return matrix;
 	}
 
 	private void readDataPoint(String data, int row, int col) throws RuntimeException {

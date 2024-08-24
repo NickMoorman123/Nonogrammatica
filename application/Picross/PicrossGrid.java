@@ -6,7 +6,6 @@ import java.util.PrimitiveIterator;
 import java.util.function.Function;
 import java.util.stream.IntStream;
 
-import Solver.PicrossSolver;
 import javafx.animation.AnimationTimer;
 import javafx.application.Platform;
 import javafx.collections.ObservableList;
@@ -208,21 +207,6 @@ public abstract class PicrossGrid {
 		for (RowText text : rowPicrossTexts) {
 			text.setWidth(newWidth);
 		}
-	}
-
-	public int[][] getMatrix() { 
-		int[][] matrix = new int[rowCount][colCount];
-		PrimitiveIterator.OfInt rowIterator = IntStream.range(0, rowCount).iterator();
-		while (rowIterator.hasNext()) {
-			int rowIndex = rowIterator.next();
-			PrimitiveIterator.OfInt colIterator = IntStream.range(0, colCount).iterator();
-			while (colIterator.hasNext()) {
-				int colIndex = colIterator.next();
-				matrix[rowIndex][colIndex] = (picrossPanes[rowIndex][colIndex].filled() ? PicrossSolver.FILLED_CELL : PicrossSolver.CROSSED_CELL);
-			}
-		}
-
-		return matrix;
 	}
 
 	public ObservableList<RowConstraints> getRowConstraints() {

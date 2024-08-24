@@ -87,7 +87,7 @@ abstract class PicrossLineSolver {
         }
 
         if (distribution[0] == countSegments - 1 && !foundPassing) {
-            throw new RuntimeException("No distribution passed");
+            throw new IllegalStateException("No distribution passed");
         } 
         return foundPassing;
     }
