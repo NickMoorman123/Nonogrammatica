@@ -25,7 +25,6 @@ import javafx.stage.Stage;
 
 public class PicrossViewer extends PicrossGrid {
 	private PicrossSolver picrossSolver;
-	private ExecutorService solverExecutor;
     private ConcurrentLinkedQueue<SolutionDisplayStep> solutionDisplaySteps;
 	private PicrossText currentPicrossText;
 	private Runnable runnableOnComplete;
@@ -49,7 +48,7 @@ public class PicrossViewer extends PicrossGrid {
 
 		currentPicrossText = rowPicrossTexts[0];
 
-		solverExecutor = Executors.newSingleThreadExecutor();
+		var solverExecutor = Executors.newSingleThreadExecutor();
 		solverExecutor.submit(() -> solverResult = Optional.of(picrossSolver.solvable()));
 
 		solutionDisplaySteps = picrossSolver.getSolutionSteps();
@@ -119,6 +118,7 @@ public class PicrossViewer extends PicrossGrid {
 		triedGuessing = true;
 		solverResult = Optional.empty();
 		addedButton = false;
+		var solverExecutor = Executors.newSingleThreadExecutor();
 		solverExecutor.submit(() -> solverResult = Optional.of(picrossSolver.solvableWithGuessAndCheck()));
 		timer.start();
 	}
